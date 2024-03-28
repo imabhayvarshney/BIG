@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: bigid-mq
+  name: bigid-mq
+spec:
+  ports:
+  - name: management
+    port: {{ .Values.global.bigid.rabbitmq.ports.mgmt }}
+    targetPort: {{ .Values.global.bigid.rabbitmq.ports.mgmt }}
+  - name: amqp-secured
+    port: {{ .Values.global.bigid.rabbitmq.ports.amqpSecure }}
+    targetPort: {{ .Values.global.bigid.rabbitmq.ports.amqpSecure }}
+  - name: amqp
+    port: {{ .Values.global.bigid.rabbitmq.ports.amqp }}
+    targetPort: {{ .Values.global.bigid.rabbitmq.ports.amqp }}
+  selector:
+    app: bigid-mq

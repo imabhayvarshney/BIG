@@ -1,0 +1,289 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-aci
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-aci
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "aci.labels" . | nindent 4 }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.aci.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-aci
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.aci.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.aci.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with .Values.global.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-aci
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-aci.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-aci.service: bigid-aci
+        tags.datadoghq.com/service: "bigid-aci"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      serviceAccount: bigid-aci
+      automountServiceAccountToken: false
+      initContainers:
+      - name: init-config-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until wget -q --spider http://bigid-config-service:{{ .Values.global.bigid.configService.port }}/actuator/health; do echo waiting for bigid-config-service; sleep 3; done"]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.global.bigid.tenantService.create }}
+      - name: init-tenant-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-tenant-service:{{ .Values.global.bigid.tenantService.port }}/api/v1/tenant-service/health; do echo waiting for bigid-tenant-service; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      - name: init-orchestrator
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-orch:{{ .Values.global.bigid.orchestrator.port }}/health; do echo waiting for bigid-orch; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      - name: init-orchestrator2
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-orch2:{{ .Values.global.bigid.orchestrator2.port }}/health; do echo waiting for bigid-orch2; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      containers:
+      - name: bigid-aci
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.aci.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        livenessProbe:
+          httpGet:
+            path: /api/v1/aci/health-check
+            port: 4001
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 45
+        readinessProbe:
+          httpGet:
+            path: /api/v1/aci/health-check
+            port: 4001
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 45
+        ports:
+        - containerPort: {{ .Values.global.bigid.aci.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-node-configuration
+        - configMapRef:
+            name: global-configuration
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.bigid.aci.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-aci.env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-aci.service']
+        {{- end }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: redis-pass
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "bigid.secretKey" . }}
+              key: secretKey
+        - name: SECRET_SALT
+          valueFrom:
+            secretKeyRef:
+              name: secret-key
+              key: secretSalt
+        - name: BIGID_MQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-user
+        - name: BIGID_MQ_PWD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-pass
+        - name: USE_SAAS
+          value: {{ .Values.global.bigid.useSaas.enabled | quote }}
+        - name: SAAS_ENV
+          value: {{ .Values.global.bigid.saasEnv | quote }}
+        - name: COMPANY_NAME
+          value: {{ .Values.global.bigid.companyName | quote }}
+        - name: DL_STREAM_NAME
+          value: {{ .Values.global.bigid.dataLakeClient.dlStreamName | quote }}
+        - name: MULTI_TENANT_MODE_ENABLED
+          value: {{ .Values.global.bigid.multiTenantMode.enabled | quote }}
+        - name: BIGID_SCHEDULER_ENABLED
+          value: {{ .Values.global.bigid.bigidScheduler.enabled | quote }}
+        - name: MULTI_TENANT_CONFIG_ENABLED
+          value: {{ .Values.global.bigid.configService.multiTenantConfigEnabled | quote }}
+        - name: DISABLE_SERVICES_LOGS
+          value: {{ .Values.global.bigid.shouldDisableLogs | quote }}
+        - name: SHOULD_GENERATE_AND_STORE_MONGO_CREDS_FF
+          value: {{ .Values.global.bigid.multiTenantMode.generateAndUseMongoCreds | quote }}
+        - name: BIGID_MQ_PROTOCOL
+          value: "amqps://"
+        - name: NODE_OPTIONS
+          value: {{ printf "$(NODE_APM_OPTS) %s" (include "nodeJs.maxOldSpaceSize" .Values.global.bigid.aci) | quote }}
+        - name: SCALABLE_HEALTH_CHECK_ENABLED
+          value: {{ .Values.global.bigid.scalableHealthCheck.enabled | quote }}
+        - name: DISABLE_LEGACY_ACL_FF
+          value: {{ .Values.global.bigid.disableLegacyAclFF | quote }}
+        - name: USE_PREFETCH_SUPPORTED_CONSUMERS
+          value: {{ .Values.global.bigid.aci.usePrefetchSupportedConsumers | quote }}
+        - name: SENSITIVITY_CLASSIFICATION_V2_ENABLED
+          value: {{ .Values.global.bigid.sensitivityClassificationV2Enabled | quote }}
+        - name: ACI_DASHBOARD_GENERATION_ENABLED
+          value: {{ .Values.global.bigid.aci.aciDashboardGenerationEnabled | quote }}
+        - name: ACI_DASHBOARD_IN_PROGRESS_TIMEOUT_MS
+          value: {{ .Values.global.bigid.aci.aciDashboardInProgressTimeoutMs | quote }}
+        - name: PREFETCH_COUNT_DEFAULT
+          value: {{ .Values.global.bigid.aci.prefetchCountDefault | quote }}
+        - name: PREFETCH_COUNT_ACI_EXECUTION
+          value: {{ .Values.global.bigid.aci.prefetchCountACIExecution | quote }}
+        - name: PREFETCH_COUNT_DASHBOARD_FETCH_DS_DATA
+          value: {{ .Values.global.bigid.aci.prefetchCountDashboardFetchDS | quote }}
+        - name: PREFETCH_COUNT_DASHBOARD_GENERATION_ON_DS_DELETION
+          value: {{ .Values.global.bigid.aci.prefetchCountDashboardDeleteDS | quote }}
+        - name: PREFETCH_COUNT_LABELING
+          value: {{ .Values.global.bigid.aci.prefetchCountLabeling | quote }}
+        - name: PREFETCH_COUNT_LABELS_UPDATE
+          value: {{ .Values.global.bigid.aci.prefetchCountLabelsUpdate | quote }}
+        - name: PREFETCH_COUNT_UPDATE_SC_CLASSIFICATION_BSTRP
+          value: {{ .Values.global.bigid.aci.prefetchCountSensitivityClassificationBootstrap | quote }}
+        - name: PREFETCH_COUNT_UPDATE_SC_BY_DIFF
+          value: {{ .Values.global.bigid.aci.prefetchCountSensitivityClassificationDiffEvents | quote }}
+        - name: PREFETCH_COUNT_INTERNAL_TASKS_QUEUE
+          value: {{ .Values.global.bigid.aci.prefetchCountInternalTask | quote }}
+        - name: PREFETCH_COUNT_UPDATE_SC_BY_DIFF_STRUCTURED
+          value: {{ .Values.global.bigid.aci.prefetchCountSensitivityClassificationStructured | quote }}
+        - name: PREFETCH_COUNT_UPDATE_SC_BY_DIFF_UNSTRUCTURED
+          value: {{ .Values.global.bigid.aci.prefetchCountSensitivityClassificationUnstructured | quote }}
+        - name: PREFETCH_COUNT_ROUTE_CATALOG_DIFF_TO_SC_QUEUE
+          value: {{ .Values.global.bigid.aci.prefetchCountRouteCatalogDiffsToSCQueue | quote }}
+        - name: DEFAULT_MAX_TIME_TO_ACK_SEC
+          value: {{ .Values.global.bigid.aci.DefaultMaxAckTimeSec | quote }}
+        - name: DEFAULT_MAX_TIME_TO_ACK_DASHBOARD_FETCH_DS_DATA_SEC
+          value: {{ .Values.global.bigid.aci.DefaultMaxAckTimeDashboardFetchDSSec | quote }}
+        - name: DEFAULT_MAX_TIME_TO_ACK_DASHBOARD_GENERATION_ON_DS_DELETION_SEC
+          value: {{ .Values.global.bigid.aci.DefaultMaxAckTimDashboardDeleteDSSec | quote }}
+        - name: DEFAULT_MAX_TIME_TO_ACK_LABELING_SEC
+          value: {{ .Values.global.bigid.aci.DefaultMaxAckTimeLabelingSec | quote }}
+        - name: SMB_V2_ACI_ENABLED
+          value: {{ .Values.global.bigid.smbV2AciEnabled | quote }}
+        - name: ACI_COA_DIRECT_ACCESS_POLICIES_ENABLED
+          value: {{ .Values.global.bigid.aci.coaDirectAccessPoliciesEnabled | quote }}
+        - name: ACI_SUPPORT_FOR_FOLDERS_ENABLED
+          value: {{ .Values.global.bigid.aciSupportForFoldersEnabled | quote }}
+        - name: ACI_POLICIES_FOR_FOLDERS_ENABLED
+          value: {{ ternary true false (and .Values.global.bigid.aciSupportForFoldersEnabled .Values.global.bigid.metadataSearch.create) | quote }}
+        volumeMounts:
+          - name: bigid-mongodb-ca
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.global.bigid.aci.resources | nindent 10 }}
+      volumes:
+      - name: bigid-mongodb-ca
+        secret:
+          secretName: bigid-mongodb-ca
+          defaultMode: 420
+      {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

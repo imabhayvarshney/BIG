@@ -1,0 +1,265 @@
+global:
+  bigid:
+    scanner:
+      resources:
+        requests:
+          memory: 22Gi
+          cpu: 2
+        limits:
+          memory: 22Gi
+          cpu: 7000m
+
+    scaler:
+        create: true
+        requests:
+          memory: 1Gi
+          cpu: 250m
+        limits:
+          memory: 2Gi
+          cpu: 1
+        minPods: 1
+        maxPods: 4
+
+    correlator:
+      resources:
+        requests:
+          memory: 28Gi
+          cpu: 7
+        limits:
+          memory: 28Gi
+          cpu: 8
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 40
+
+    ner:
+      resources:
+        requests:
+          memory: 6Gi
+          cpu: 1
+        limits:
+          memory: 6Gi
+          cpu: 2
+
+    labeler:
+      resources:
+        requests:
+          memory: 384Mi
+          cpu: 200m
+        limits:
+          memory: 500Mi
+          cpu: 300m
+
+    web:
+      resources:
+        requests:
+          memory: 500Mi
+          cpu: 250m
+        limits:
+          memory: 8Gi
+          cpu: 1250m
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 2
+
+    ui:
+      resources:
+        requests:
+          memory: 512Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+          cpu: 2500m
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 2
+
+    clustering:
+      worker:
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 500m
+          limits:
+            memory: 8Gi
+            cpu: 2500m
+      scheduler:
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 250m
+          limits:
+            memory: 8Gi
+            cpu: 2500m
+      gateway:
+        resources:
+          requests:
+            memory: 500Mi
+            cpu: 500m
+          limits:
+            memory: 8Gi
+            cpu: 3
+      hotspots:
+        resources:
+          requests:
+            memory: 500Mi
+            cpu: 500m
+          limits:
+            memory: 8Gi
+            cpu: 3
+
+    aci:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 250m
+        limits:
+          memory: 8Gi
+          cpu: 3
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 16
+
+    reportingEtl:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 6Gi
+          cpu: 1200m
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 4
+
+    orchestrator:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 750m
+        limits:
+          memory: 6Gi
+          cpu: 2
+
+    orchestrator2:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 6Gi
+          cpu: 2
+      consumer:
+        enabled: true
+        autoscaling:
+          enabled: true
+          minReplicas: 1
+          maxReplicas: 16
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 16
+
+    configService:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 6Gi
+          cpu: 2
+
+    metadataSearch:
+      resources:
+        requests:
+          memory: 10Gi
+          cpu: 4
+        limits:
+          memory: 1Gi
+          cpu: 1
+
+    dataCatalog:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 9Gi
+          cpu: 1200m
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 4
+
+    dataCatalogConsumer:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 2Gi
+          cpu: 1000m
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 16
+
+rabbitmq:
+  replicaCount: 1
+  resources:
+    limits:
+      memory: 4Gi
+      cpu: 5000m
+    requests:
+      memory: 1Gi
+      cpu: 500m
+
+mongodb:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 500m
+    limits:
+      memory: 9Gi
+      cpu: 7
+
+redis:
+  architecture: "standalone"
+  sentinel:
+    enabled: false
+  replica:
+    replicaCount: 1
+    resources:
+      requests:
+        memory: 250Mi
+        cpu: 250m
+      limits:
+        memory: 500Mi
+        cpu: 1
+  auth:
+    enabled: false
+    password: ""
+
+elasticsearch:
+  data:
+    resources:
+      limits:
+        cpu: 2
+        memory: 16Gi
+      requests:
+        cpu: 500m
+        memory: 6Gi
+  master:
+    resources:
+      limits:
+        cpu: 2
+        memory: 8Gi
+      requests:
+        cpu: 500m
+        memory: 2Gi

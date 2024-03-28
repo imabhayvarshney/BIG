@@ -1,0 +1,61 @@
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  bigid:
+    ## @param global.bigid.containerSecurityContext Security Context for BigID containers
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsGroup: 1001
+    ## @param global.bigid.podSecurityContext Security Context for BigID pods
+    podSecurityContext:
+      enabled: false
+      runAsUser: 1001
+      runAsGroup: 1001
+    metadataSearch:
+      create: false
+      serviceAccount:
+        create: true
+        annotations: {}
+      replicaCount: 1
+      ssl: false
+      image:
+        repository: "bigid-metadata-search"
+      podAnnotations: {}
+      heapSizePercent: 85
+      logLevel: info
+      sslCertPath: "/tmp/escerts/ca.crt"
+      appAccessToken: ""
+      JavaOpts: ""
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+      elasticsearchSsl:
+        create: false
+      catalogUploaderThreads: 10
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "1"
+        limits:
+          memory: "6Gi"
+          cpu: "2"
+      uploaderBulkSize: 400
+      extraEnvVars: []
+      port: 8082
+      monitorDiscrepancies:
+        cronSchedule: "0 0 2 * * *"
+        ratioThreshold: 0.005
+        numberOfObjectsThreshold: 500000

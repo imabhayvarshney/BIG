@@ -1,0 +1,23 @@
+Congratulations. You have just installed BigID!
+Note: It may take a few minutes for the Ingress LoadBalancer IP to be available.
+You can get BigID URL by running: kubectl get --namespace bigid --no-headers=true ing bigid-ui-ingress | awk '{print "Login to BigID App: https://"$4}'
+
+#########################################################################################################
+#                                                                                                       #
+#                                           NOTICE!                                                     #
+#                                                                                                       #
+# All changes to our Helm charts should be made only in the umbrella values.yaml file                   #
+#                                                                                                       #
+# If you must edit this chart, please inform your BigID technical contact                               #
+# (support@bigid.com) about the changes for future troubleshooting and to inform the                    #
+# BigID DevOps to improve the Helm chart.                                                               #
+#                                                                                                       #
+# Please note that unauthorized changes to these charts may result in unexpected or unintended          #
+# consequences. If you have any questions or concerns about their usage, please contact the appropriate #
+# personnel for assistance. Thank you for your cooperation.                                             #
+#                                                                                                       #
+# BigID Technical Support: support@bigid.com                                                            #
+#                                                                                                       #
+# Thank you.                                                                                            #
+#                                                                                                       #
+#########################################################################################################

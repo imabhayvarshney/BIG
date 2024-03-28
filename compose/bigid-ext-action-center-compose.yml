@@ -1,0 +1,6 @@
+version: "3.2"
+
+services:
+  bigid-action-center:
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}

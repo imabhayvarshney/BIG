@@ -1,0 +1,47 @@
+version: '3.2'
+services:
+  bigid-tenant-service:
+    image: bigid/bigid-tenant-service${BIGID_ENV}
+    expose:
+      - "3558"
+    container_name: bigid-tenant-service
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - PORT=${TENANT_SERVICE_PORT:-3558}
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - SECRET_KEY
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - MONGO_EXTERNAL_FULL_URL
+      - MONGO_PUBLIC_FULL_URL
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC # Same as up.
+      - LOG_LEVEL
+      - BIGID_CONFIG_URL
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+    hostname: bigid-tenant-service
+    restart: always
+    volumes:
+      - type: bind
+        source: ./mongo/ssl
+        target: /etc/ssl/bigid
+        read_only: true
+
+  bigid-web:
+    environment:
+      - ENABLE_TENANT_SERVICE=true
+
+  bigid-orch:
+    environment:
+      - ENABLE_TENANT_SERVICE=true
+
+  bigid-orch2:
+    environment:
+      - ENABLE_TENANT_SERVICE=true

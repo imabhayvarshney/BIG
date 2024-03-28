@@ -1,0 +1,115 @@
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  bigid:
+    ## @param global.bigid.containerSecurityContext Security Context for BigID containers
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsGroup: 1001
+    ## @param global.bigid.podSecurityContext Security Context for BigID pods
+    podSecurityContext:
+      enabled: false
+      runAsUser: 1001
+      runAsGroup: 1001
+    ddMetrics:
+      ddApiKey: ""
+      ddURI: ""
+      dataDogEnabled: false
+    saasEnv: "staging"
+
+    # BigID Scheduler settings
+    bigidScheduler:
+      # Set to true to enable the BigID Scheduler feature
+      enabled: true
+      # Set to true to enable metrics for BigID Scheduler
+      metricsEnabled: true
+      # Set to true to enable logging of job triggers for BigID Scheduler
+      logJobTriggeredEnabled: true
+      # Cron expression for collecting metrics on the count of jobs executed in orch2
+      jobsCountMetricsCronExp: "*/5 * * * *"
+      # Cron expression for collecting metrics on the count of job triggers in orch2
+      jobsTriggeredCountMetricsCronExp: "*/5 * * * *"
+      # Time-to-live (TTL) for the job modification lock in milliseconds in orch2
+      jobModifylockTtlMs: 5000
+
+
+    orchestrator2:
+      replicaCount: 1
+      image:
+        repository: "bigid-orch"
+      serviceAccount:
+        create: true
+        annotations: {}
+      environmentFF: "prod"
+      autoRetryScanPartsFF: true
+      classificationNewFlow: true
+      nodeOptions: ""
+      nodeMaxOldSpaceSizePercent: 85
+      dynamicModifyParsingThreadsFF: true
+      correlationSetsInfrastructureEnabled: false
+      confidenceLevelCalculationV2FF: false
+      metadataUpdateBulkEnabled: false
+      metadataUpdateBulkSize: 40
+      structuredClassificationSamplingEnabled: false
+      metadataUpdateBackpressure: false
+      enableSseOnMlFF: true
+      llmEnginePortalAppUrl: "https://portal-bigchat-staging.bigid.cloud"
+      logLevel: trace
+      prefetchCount: 40
+      mqDSPMPrefetchCount: 20
+      disableWideClassifiers: false
+      signingServiceEnabled: false
+      enableReleaseStuckPartsInCacheFF: true
+      redisQueuedScanPartsMaxIdleTimeMinutesFF: 360
+      scanWindowSchedulerEnabledFF: false
+      podAnnotations: {}
+      scalableDeletion:
+        scheduleInterval: 10000
+        jobTTL: 60000
+        maxDeletionWorkers: 10
+        chunkSize: 1000
+        updatedAtFieldUpdatesIntervalMS: 5000
+      deleteClassificationFindings:
+        enabled: false
+        deletionPeriodDays: 60
+        scheduleInterval: 1440
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+      extraEnvVars: []
+      autoscaling:
+        enabled: false
+        minReplicas: 1
+        maxReplicas: 5
+        averageValue: 250
+        completedQueueThreshold: 250
+        targetCPUUtilizationPercentage: 75
+        scaleDownPolicy:
+          stabilizationWindowSeconds: 900
+          periodSeconds: 300
+          value: 10
+      consumer:
+        create: false
+        autoscaling:
+          enabled: false
+          minReplicas: 1
+          maxReplicas: 5
+          averageValue: 250
+          completedQueueThreshold: 250
+          targetCPUUtilizationPercentage: 75
+          dsarPendingEnrichmentJobs: 250
+          scaleDownPolicy:
+            stabilizationWindowSeconds: 900
+            periodSeconds: 300
+            value: 10

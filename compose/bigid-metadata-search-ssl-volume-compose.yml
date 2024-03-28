@@ -1,0 +1,9 @@
+version: '3.2'
+
+services:
+  bigid-metadata-search:
+    volumes:
+      - type: bind
+        source: ./elasticsearch/ssl
+        target: /etc/ssl/bigid
+        read_only: true

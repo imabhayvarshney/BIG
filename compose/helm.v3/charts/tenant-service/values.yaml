@@ -1,0 +1,110 @@
+# Default values for tenant-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+fullnameOverride: bigid-tenant-service
+nameOverride: ""
+
+## Global defaults values
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  bigid:
+    saasEnv: staging
+    tenantService:
+      serviceAccount:
+        # Specifies whether a service account should be created
+        create: true
+        # Annotations to add to the service account
+        annotations: {}
+        # The name of the service account to use.
+        # If not set and create is true, a name is generated using the fullname template
+        name: ""
+      mongodb:
+        mongoUri: '?authSource=admin&replicaSet=bigid-replica-set'
+        dbName: bigid-multi-tenant
+        adminTenantId: "00000000"
+        bigidDbName: bigid-server
+      create: false
+      replicaCount: 1
+      fullnameOverride: "bigid-tenant-service"
+      nodeOptions: ""
+      nodeMaxOldSpaceSizePercent: 85
+      generateAndStoreSecretsInSecretsManager:
+        enabled: false
+      awsSecretsManager:
+        region: "us-east-1"
+      generateAndUseElasticSearchCreds:
+        enabled: false
+      shouldPublishMigrationRequestToPortal:
+        enabled: "false"
+      atlasApiSecretName: ""
+      image:
+        registry: 835626702473.dkr.ecr.us-east-1.amazonaws.com
+        repository: bigid-tenant-service
+        pullPolicy: IfNotPresent
+        # Overrides the image tag whose default is the chart appVersion.
+        tag: "2.0"
+
+      imagePullSecrets: []
+
+      podAnnotations:
+        ad.datadoghq.com/bigid-tenant.logs: '[{"source": "python", "service": "tenant"}]'
+
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+
+      extraEnvVars: []
+
+
+      podSecurityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+      securityContext:
+        #capabilities:
+        #  drop:
+        #    - ALL
+        #allowPrivilegeEscalation: false
+        #runAsNonRoot: true
+      service:
+        type: ClusterIP
+        port: 3558
+
+      livenessProbe:
+        enabled: false
+        path: /api/v1/tenant-service/health
+        initialDelaySeconds: 20
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+        successThreshold: 1
+
+      readinessProbe:
+        enabled: false
+        path: /api/v1/tenant-service/health
+        initialDelaySeconds: 20
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+        successThreshold: 1
+
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "1"
+        limits:
+          memory: "6Gi"
+          cpu: "1200m"
+      tolerations: []
+      affinity: {}

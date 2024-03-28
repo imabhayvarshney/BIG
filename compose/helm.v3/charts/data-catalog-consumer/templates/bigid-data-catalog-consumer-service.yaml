@@ -1,0 +1,19 @@
+{{- if .Values.global.bigid.dataCatalogConsumer.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-data-catalog-consumer
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-data-catalog-consumer
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.global.bigid.dataCatalogConsumer.port }}
+      targetPort: {{ .Values.global.bigid.dataCatalogConsumer.port }}
+      name: http
+  selector:
+    app: bigid-data-catalog-consumer
+{{- end }}

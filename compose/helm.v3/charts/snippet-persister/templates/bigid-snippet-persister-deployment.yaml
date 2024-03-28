@@ -1,0 +1,185 @@
+{{- if .Values.global.bigid.snippetPersister.create -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-snippet-persister
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-snippet-persister
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.snippetPersister.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-snippet-persister
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.snippetPersister.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.snippetPersister.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with .Values.global.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-snippet-persister
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+      - name: bigid-snippet-persister
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.snippetPersister.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        securityContext:
+          {{- toYaml .Values.global.bigid.snippetPersister.securityContext | nindent 10 }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: {{ .Values.global.bigid.snippetPersister.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: {{ .Values.global.bigid.snippetPersister.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        ports:
+         - containerPort: {{ .Values.global.bigid.snippetPersister.port }}
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.bigid.snippetPersister.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "bigid.secretKey" . }}
+              key: secretKey
+        - name: SECRET_SALT
+          valueFrom:
+            secretKeyRef:
+              name: secret-key
+              key: secretSalt
+        - name: PERSIST_SERVICE_PORT
+          value: {{ .Values.global.bigid.snippetPersister.port | quote }}
+        {{- if .Values.global.bigid.snippetPersister.snowflake.enabled }}
+        - name: SPRING_PROFILES_ACTIVE
+          value: "snowflake"
+        - name: SNOWFLAKE_USER
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.username | quote }}
+        - name: SNOWFLAKE_TOKEN
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.token | quote }}
+        - name: SNOWFLAKE_ACCOUNT
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.account | quote }}
+        - name: SNOWFLAKE_DB
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.database | quote }}
+        - name: SNOWFLAKE_SCHEMA
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.schema | quote }}
+        - name: SNOWFLAKE_REGION
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.region | quote }}
+        - name: SNOWFLAKE_AUTH
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.authentication | quote }}
+        - name: SNOWFLAKE_WAREHOUSE
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.warehouse | quote }}
+        - name: OAUTH_REFRESH_TOKEN_ON_STARTUP
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.oAuthRefreshTokenOnStartup | quote }}
+        - name: SNOWFLAKE_OAUTH_CLIENTID
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.oAuthClientId | quote }}
+        - name: SNOWFLAKE_OAUTH_SECRET
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.oauthSecret | quote }}
+        - name: SNOWFLAKE_AWS_OAUTH_ROLENAME
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.arnRole | quote }}
+        - name: AWS_SNOWFLAKE_OAUTH_SECRET_ID
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.awsOAuthSecretId | quote }}
+        - name: SNOWFLAKE_REFRESH_TOKEN
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.oauthRefreshToken | quote }}
+        - name: HIKARI_MAX_POOL_SIZE
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.pool.size | quote }}
+        - name: HIKARI_CONNECTION_TIMEOUT
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.pool.connectionTimeout | quote }}
+        - name: HIKARI_MAX_LIFETIME
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.pool.maxLifetime | int64 | quote }}
+        - name: HIKARI_KEEPALIVE_TIME
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.pool.keepAliveTime | quote }}
+        - name: HIKARI_LEAK_THRESHOLD
+          value: {{ .Values.global.bigid.snippetPersister.snowflake.pool.leakThreshold | quote }}
+        {{- end }}
+        {{- if .Values.global.bigid.snippetPersister.postgres.enabled }}
+        - name: SPRING_PROFILES_ACTIVE
+          value: "postgres"
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: bigid-snippet-persister-postgress
+              key: postgress_username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-snippet-persister-postgress
+              key: postgress_password
+        - name: DATABASE_ENDPOINT
+          value: {{ .Values.global.bigid.snippetPersister.postgres.endpoint | quote }}
+        - name: POSTGRES_DB
+          value: {{ .Values.global.bigid.snippetPersister.postgres.db | quote }}
+        - name: POSTGRES_SCHEMA
+          value: {{ .Values.global.bigid.snippetPersister.postgres.schema | quote }}
+        - name: POSTGRES_AUTH
+          value: {{ .Values.global.bigid.snippetPersister.postgres.authentication | quote }}
+        - name: POSTGRES_ROLE_ARN
+          value: {{ .Values.global.bigid.snippetPersister.postgres.arnRole | quote }}
+        - name: AWS_POSTGRES_SECRET_ID
+          value: {{ .Values.global.bigid.snippetPersister.postgres.awsSecretId | quote }}
+        - name: HIKARI_MAX_POOL_SIZE
+          value: {{ .Values.global.bigid.snippetPersister.postgres.pool.size | quote }}
+        - name: HIKARI_CONNECTION_TIMEOUT
+          value: {{ .Values.global.bigid.snippetPersister.postgres.pool.connectionTimeout | quote }}
+        - name: HIKARI_MAX_LIFETIME
+          value: {{ .Values.global.bigid.snippetPersister.postgres.pool.maxLifetime | int64 | quote }}
+        - name: HIKARI_KEEPALIVE_TIME
+          value: {{ .Values.global.bigid.snippetPersister.postgres.pool.keepAliveTime | quote }}
+        - name: HIKARI_LEAK_THRESHOLD
+          value: {{ .Values.global.bigid.snippetPersister.postgres.pool.leakThreshold | quote }}
+      {{- end }}
+        - name: BIGID_UI_PORT
+          value: {{ .Values.global.bigid.web.port | quote }}
+        - name: BIGID_UI_PROTOCOL_EXT
+          value: "http"
+        - name: BIGID_UI_HOST_EXT
+          value: "bigid-web"
+        - name: USE_HEALTH_CHECK
+          value: "true"
+        - name: SNIPPET_HTTP_SIMULATOR_ENABLED
+          value: {{ .Values.global.bigid.snippetPersister.simulator | quote }}
+        resources:
+          {{- toYaml .Values.global.bigid.snippetPersister.resources | nindent 10 }}
+      {{- if .Values.global.imageCredentials.enabled }}
+      imagePullSecrets:
+        - name: registrypullsecret
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-configuration
+  namespace: {{ .Release.Namespace | quote }}
+data:
+  BIGID_REDIS_SENTINEL_MODE: {{ .Values.redis.sentinel.enabled | quote }}
+  BIGID_REDIS_REPLICAS_HOST_PREFIX: {{ include "redis.replicas.host.prefix" . | quote }}
+  BIGID_REDIS_REPLICAS_HOST_SUFFIX: {{ include "redis.replicas.host.suffix" . | quote }}
+  BIGID_REDIS_REPLICAS_NUMBER: {{ .Values.redis.replica.replicaCount | quote }}
+  BIGID_REDIS_SENTINEL_PORT: {{ include "redis.sentinel.port" . | quote }}

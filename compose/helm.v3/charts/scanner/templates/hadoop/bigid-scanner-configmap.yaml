@@ -1,0 +1,16 @@
+{{- if or .Values.global.bigid.scanner.krb5ConfFile .Values.global.bigid.scanner.krb5Conf }}
+{{- if .Values.global.bigid.scanner.hadoop.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-{{ .Values.global.bigid.scanner.hadoop.fullnameOverride | default "hadoop-config" }}"
+  namespace: {{ .Release.Namespace | quote }}
+{{- if .Values.global.bigid.scanner.krb5ConfFile }}
+binaryData:
+  krb5.conf: {{ .Values.global.bigid.scanner.krb5ConfFile }}
+{{- else }}
+data:
+  krb5.conf: {{ .Values.global.bigid.scanner.krb5Conf | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

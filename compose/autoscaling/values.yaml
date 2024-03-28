@@ -1,0 +1,180 @@
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  # Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+
+metrics-server:
+  enabled: true
+
+prometheus:
+  enabled: true
+  alertmanager:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+  pushgateway:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false
+  server:
+    global:
+      scrape_interval: 15s
+    retention: "10m"
+    persistentVolume:
+      enabled: false
+    resources:
+      requests:
+        memory: 4Gi
+      limits:
+        memory: 10Gi
+  serverFiles:
+    prometheus.yml:
+      rule_files:
+        - /etc/config/recording_rules.yml
+        - /etc/config/alerting_rules.yml
+      ## Below two files are DEPRECATED will be removed from this default values file
+        - /etc/config/rules
+        - /etc/config/alerts
+
+      scrape_configs:
+        - job_name: prometheus
+          static_configs:
+            - targets:
+              - localhost:9090
+
+        - job_name: 'kubernetes-apiservers'
+
+          kubernetes_sd_configs:
+            - role: endpoints
+
+          # Default to scraping over https. If required, just disable this or change to
+          # `http`.
+          scheme: https
+
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            insecure_skip_verify: true
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+          # Keep only the default/kubernetes service endpoints for the https port. This
+          # will add targets for each API server which Kubernetes adds an endpoint to
+          # the default/kubernetes service.
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+              action: keep
+              regex: default;kubernetes;https
+
+        - job_name: 'kubernetes-pods'
+
+          kubernetes_sd_configs:
+            - role: pod
+
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape_slow]
+              action: drop
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+              action: replace
+              regex: (https?)
+              target_label: __scheme__
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
+              replacement: __param_$1
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: pod
+            - source_labels: [__meta_kubernetes_pod_phase]
+              regex: Pending|Succeeded|Failed|Completed
+              action: drop
+
+prometheus-adapter:
+  enabled: true
+  prometheus:
+    url: http://{{ .Release.Name }}-prometheus-server.{{ .Release.Namespace }}.svc
+    port: 80
+  rules:
+    custom:
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "correlator_queue"
+      metricsQuery: 'sum(<<.Series>>{queue="correlator.correlation.queue",<<.LabelMatchers>>} or <<.Series>>{queue="correlator.classification.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "catalog_queue"
+      metricsQuery: 'sum(<<.Series>>{queue=~"catalog.*",queue!="catalog.object.scan.completed.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_queue"
+      metricsQuery: 'sum(<<.Series>>{queue=~"correlator.aggregateClassification.queue|orch.object.attributes.queue|updateConfLvlSarFields",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_enrichment_findings"
+      metricsQuery: 'sum(<<.Series>>{queue=~"enrichment.findings.*",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_completed_queue"
+      metricsQuery: 'sum(<<.Series>>{queue=~"catalog.object.scan.completed.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_dsar_field_enrichment_queue"
+      metricsQuery: 'sum(<<.Series>>{queue="orch.enrichDsarProfileFields.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_pii_findings"
+      metricsQuery: 'sum(<<.Series>>{queue=~"pii.findings.*",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_classification_findings"
+      metricsQuery: 'sum(<<.Series>>{queue=~"classification.findings.*",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "aci_queue"
+      metricsQuery: 'sum(<<.Series>>{queue=~"aci.*",queue!="aci.logs.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "aci_labeling_queue"
+      metricsQuery: 'sum(<<.Series>>{queue=~"labeling.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'
+    - seriesQuery: 'rabbitmq_queue_messages_ready{pod!=""}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "orch2_object_diff_dsinsight"
+      metricsQuery: 'sum(<<.Series>>{queue=~"catalog.object.diff.dsInsight.queue",<<.LabelMatchers>>}) by (<<.GroupBy>>)'

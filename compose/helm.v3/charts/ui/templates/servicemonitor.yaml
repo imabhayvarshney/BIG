@@ -1,0 +1,36 @@
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "ui.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  {{- if .Values.metrics.serviceMonitor.namespace }}
+  namespace: {{ .Values.metrics.serviceMonitor.namespace | quote }}
+  {{- end }}
+  labels: {{- include "ui.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+  {{- with .Values.metrics.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 8 }}
+  {{- end }}
+spec:
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      {{- if .Values.metrics.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+      {{- end }}
+      honorLabels: {{ .Values.metrics.serviceMonitor.honorLabels }}
+      {{- if .Values.metrics.serviceMonitor.relabellings }}
+      metricRelabelings: {{- toYaml .Values.metrics.serviceMonitor.relabellings | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels: {{- include "ui.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: metrics
+{{- end }}

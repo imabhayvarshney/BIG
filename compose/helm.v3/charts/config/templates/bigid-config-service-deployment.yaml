@@ -1,0 +1,234 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-config-service
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-config-service
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "config.labels" . | nindent 4 }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.configService.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-config-service
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.configService.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.configService.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.configService.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-config-service
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-config.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-config.service: bigid-config
+        tags.datadoghq.com/service: "bigid-config"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      initContainers:
+      - name: init-mq
+        image: {{ template "initContainer.image" . }}
+        command: ['sh', '-c', 'until nc -zv $(BIGID_MQ_HOST_EXT) $(BIGID_MQ_PORT) -w1; do echo waiting for mq; sleep 3; done;']
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        envFrom:
+        - configMapRef:
+            name: global-configuration
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      - name: init-redis
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until nc -zv -w1 $(BIGID_REDIS_HOST) $(BIGID_REDIS_PORT); do echo waiting for bigid-cache; sleep 3; done"]
+        envFrom:
+        - configMapRef:
+            name: global-configuration
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      serviceAccount: bigid-config-service
+      automountServiceAccountToken: false
+      containers:
+      - name: bigid-config-service
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.configService.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ .Values.global.bigid.configService.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ .Values.global.bigid.configService.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+        ports:
+         - containerPort: {{ .Values.global.bigid.configService.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-java-configuration
+        - configMapRef:
+            name: global-configuration
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.bigid.configService.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-config.env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-config.service']
+        {{- end }}
+        - name: CONFIG_SERVICE_JVM_OPTS
+          value: {{ printf "$(JAVA_APM_OPTS) %s" (include "java.calcHeapSize" .Values.global.bigid.configService) | quote }}
+        - name: IS_FIPS_MODE
+          value: {{ .Values.global.fips.enabled | quote }}
+        - name: BOOLEAN_SERVICES_MAP
+          value: "{{ .Values.global.bigid.configService.booleanMap }}"
+        - name: SKIP_CLUSTERING_CONF
+          value: "{{ .Values.global.bigid.configService.skipClusteringConf }}"
+        - name: CONFIG_SERVICE_REDIS_CACHE
+          value: "{{ .Values.global.bigid.configService.useRedisCache }}"
+        - name: MULTI_TENANT_MODE_ENABLED
+          value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+        {{- if .Values.global.bigid.multiTenantMode.enabled }}
+        - name: ADMIN_TENANT_DB_NAME
+          value: "{{ trunc 32 .Release.Namespace }}-{{ .Values.global.bigid.tenantService.mongodb.adminTenantId }}-{{ .Values.global.bigid.tenantService.mongodb.bigidDbName }}"
+        {{- end }}
+        - name: MULTI_TENANT_CONFIG_ENABLED
+          value: {{ .Values.global.bigid.configService.multiTenantConfigEnabled | quote }}
+        - name: SHOULD_GENERATE_AND_STORE_MONGO_CREDS_FF
+          value: {{ .Values.global.bigid.multiTenantMode.generateAndUseMongoCreds | quote }}
+        - name: LOGIN_LIMIT_ENABLED
+          value: {{ .Values.global.bigid.configService.loginLimitEnabled | quote }}
+        - name: BIGID_MQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-user
+        - name: BIGID_MQ_PWD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-pass
+        resources:
+          {{- toYaml .Values.global.bigid.configService.resources | nindent 10 }}
+        volumeMounts:
+        {{- if .Values.global.fips.enabled }}
+        - name: mq-tls
+          mountPath: /tmp/rabbitcerts
+        {{- end }}
+        - name: mongo-ssl-config-service-truststore-secrets
+          mountPath: /etc/ssl/bigid
+          readOnly: true
+        - name: mongo-kerberos-config-service-secrets
+          mountPath: /etc/kerberos
+          readOnly: true
+        - name: mongo-kerberos-config-service-gss
+          mountPath: /etc/gss
+          readOnly: true
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      {{- if .Values.global.fips.enabled }}
+      - name: mq-tls
+        secret:
+          secretName: bigid-mq-secrets
+          defaultMode: 420
+          items:
+            - key: client.cert
+              path: client.cert
+      {{- end }}
+      - name: mongo-ssl-config-service-truststore-secrets
+        secret:
+          secretName: mongo-ssl-truststore-secrets
+          defaultMode: 420
+      - name: mongo-kerberos-config-service-secrets
+        secret:
+          secretName: mongo-kerberos-secrets
+          defaultMode: 420
+      - name: mongo-kerberos-config-service-gss
+        secret:
+          secretName: mongo-kerberos-gss
+          defaultMode: 420
+      {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

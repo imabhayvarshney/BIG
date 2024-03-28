@@ -1,0 +1,19 @@
+{{- if .Values.global.bigid.snippetPersister.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-snippet-persister
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-snippet-persister
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.global.bigid.snippetPersister.port }}
+      targetPort: {{ .Values.global.bigid.snippetPersister.port }}
+      name: http
+  selector:
+    app: bigid-snippet-persister
+{{- end }}

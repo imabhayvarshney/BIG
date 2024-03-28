@@ -1,0 +1,9 @@
+version: '3.2'
+
+services:
+  bigid-orch2-consumer:
+    volumes:
+      - type: bind
+        source: ./mongo/ssl
+        target: /etc/ssl/bigid
+        read_only: true

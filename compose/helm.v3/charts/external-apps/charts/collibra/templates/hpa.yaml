@@ -1,0 +1,34 @@
+{{- if .Values.enabled }}
+{{- if .Values.autoscaling.enabled }}
+{{- if $.Capabilities.APIVersions.Has "autoscaling/v2beta1/HorizontalPodAutoscaler" }}
+apiVersion: autoscaling/v2beta1
+{{- else -}}
+apiVersion: autoscaling/v1
+{{- end }}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "collibra.fullname" . }}
+  labels:
+    {{- include "collibra.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "collibra.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+{{- end }}

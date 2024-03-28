@@ -1,0 +1,19 @@
+{{- if .Values.global.bigid.lineage.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-lineage
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-lineage
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.global.bigid.lineage.port }}
+      targetPort: {{ .Values.global.bigid.lineage.port }}
+      name: lineage
+  selector:
+    app: bigid-lineage
+{{- end }}

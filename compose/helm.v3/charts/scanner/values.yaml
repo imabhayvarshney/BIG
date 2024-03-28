@@ -1,0 +1,423 @@
+# Available parameters and their default values for the BigID chart.
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+  # affinity: ""
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  scannerAffinity: ""
+  authKey: ""
+  image:
+    repository: bigid
+    tag: release
+    pullPolicy: IfNotPresent
+  ## @param global.imageCredentials - Username/Password Docker registry credentials.
+  imageCredentials:
+    enabled: false
+    registry: https://index.docker.io/v1/
+    username: ""
+    password: ""
+  ## Pod labels. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+  ##
+  podLabels: {}
+  ## Used to pass Labels that are used by the customer to select BigID Services
+  ## ref: https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#prometheusspec
+  ##
+  additionalLabels: {}
+
+  ## @param global.extraEnvVars Array with extra environment variables to add to BigID Services
+  ## e.g:
+  ## extraEnvVars:
+  ##   - name: FOO
+  ##     value: "bar"
+  ##
+  extraEnvVars: []
+
+  ## @param extraEnvVarsCM Name of existing ConfigMap containing extra env vars
+  ##
+  extraEnvVarsCM: ""
+  ## @param extraEnvVarsSecret Name of existing Secret containing extra env vars
+  ##
+  extraEnvVarsSecret: ""
+
+  ## BigID Access URL.
+  ingress:
+    bigidHost:
+
+  ## InitContainers configuration for BigID internal healthchecks
+  initContainers:
+    image:
+      registry: ""
+      repository: alpine
+      tag: edge
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 50m
+      limits:
+        memory: 512Mi
+        cpu: 250m
+
+    ## @param global.initContainers.containerSecurityContext Security Context
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+    containerSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
+
+  ## BigiD APM Monitoring, Support: NewRelic, DataDog.
+  apm:
+    enabled: false
+    type: datadog ## Types: "newrelic", "datadog".
+    customerName: ""
+    ## NewRelic Key.
+    key: ""
+
+  bigid:
+    ## @param global.bigid.containerSecurityContext Security Context for BigID containers
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      capabilities:
+        drop:
+        - ALL
+        - NET_RAW
+      allowPrivilegeEscalation: false
+
+      ## @param global.bigid.podSecurityContext Security Context for BigID pods
+    podSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+
+    ## Installation type kots/helm
+    installationType: "helm"
+    multiTenantMode:
+      enabled: false
+    ddMetrics:
+      ddApiKey: ""
+      ddURI: ""
+      dataDogEnabled: false
+    ## Default values for scanner section
+    scanner:
+      replicaCount: 1
+      uiPortInternal: 3000
+      uiProtocolInternal: "http"
+      uiHostInternal: "bigid-web"
+      deletionScanThreads: 10
+      fipsMode:
+        enabled: false
+      fipsCertDir: "/tmp/certs/"
+      fipsCertPath: "/tmp/certs/ca.cert"
+      fullnameOverride: ""
+      updateStrategy:
+        ## StrategyType
+        ## Can be set to RollingUpdate or Recreate
+        ##
+        type: RollingUpdate
+      image:
+        repository: "bigid-scanner"
+      ubi:
+        image:
+          repository: "bigid-scanner-ubi"
+      initContainer:
+        image:
+          repository: ""
+      ## @param podAnnotations Annotations for scanner pods
+      ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+      ##
+      podAnnotations: {}
+      # Enable when NFS connector is needed, make sure that the following is enabled too. global.bigid.scanner.securityContext.privileged=true
+      nfsV4:
+        enabled: false
+        # Enable when NFS connector is needed, make sure that the following is enabled too. global.bigid.scanner.nfsV4.enabled=true
+        privileged: false
+      ## Scanner node selector
+      nodeSelector: {}
+      ## Scanner additional labels
+      additionalLabels: {}
+      ## Scanner extra volumes
+      extraVolumes: []
+      ## Scanner Extra Env Vars
+      extraEnvVars: []
+      ## Scanner extra volume mounts
+      extraVolumeMounts: []
+      ## Scanner sidecars
+      sidecars: []
+
+      ## Scanner keytab Base64-encoded file
+      scannerKeyTab: ""
+      ## Scanner krb5 Base64-encoded configuration file
+      krb5ConfFile: ""
+      ## Krb5 configuration file (string)
+      krb5Conf: ""
+      ## Scanner DB2 Base64-encoded license file
+      scannerDb2LicenseFile: ""
+      dataPreviewDisabled: false
+      serviceAccount:
+        create: false
+      ## @param global.bigid.scanner.auth.enabled - Enable BigID UserName/Pass auth.
+      auth:
+        enabled: false
+        username:
+        password:
+      ## @param global.bigid.scanner.remote.enabled - Enable BigID Remote scanner.
+      remote:
+        enabled: false
+      tinyScanner:
+        enabled: false
+        replicaCount: 1
+        ## @param podAnnotations Annotations for scanner pods
+        ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+        ##
+        podAnnotations: {}
+        enabledScanManagersMt: "ds_test_connection,investigation_scan,id_conn_scan,structured_preview"
+        enabledScanManager: "ds_test_connection,import_labels,investigation_scan,id_conn_scan,row_evaluation,fetch_from_vault"
+        tenantId: "00000000"
+        healthMsgLogRage: "6"
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 500m
+          limits:
+            memory: 6Gi
+            cpu: 2
+      hadoop:
+        create: false
+        replicaCount: 1
+        image:
+          repository: "bigid-scanner-with-hadoop"
+        fullnameOverride: ""
+        groupName: "SCANNER_WITH_HADOOP_GROUP"
+      # discoveryEngineAlgorithm default value: AHO_CORASICK can change to BLOOM_FILTER
+      discoveryEngineAlgorithm: AHO_CORASICK
+      # refreshToken and groupName will be used only when globa.bigid.scanner.remote.enabled is true
+      refreshToken: ""
+      # To enable encryption playload, configure true.
+      encryptPayload: false
+      # set groupName to be whatever you want.
+      groupName: "default"
+      # set hostname for remote scanner
+      hostName: "defaultRemote"
+      # For Minimum System Requirement and Sizing Reference: https://www.docs.bigid.com/docs/standard-deployment#section-minimum-system-requirements
+      ## Calculated according to the pods limits. Possible configuration: -Xmx14g
+      JavaOpts: ""
+      heapSizePercent: 85
+      threadPoolSize: 5
+      threadSize: 5
+      threadMaxSize: 50
+      expansibleThreadPool: false
+      classifierSuperscanPrefiltering:
+        cacheExpirationPeriod: 4H
+      testConnection:
+        threadSize: 2
+        threadMaxSize: 5
+        queueSize: 10
+      # Scanner enumeration optimization
+      orchClientMaxConnectionPerRoute: "24"
+      orchClientMaxConnectionTotal: "34"
+      internalMetadataProcessingThreads: "21"
+      resources:
+        requests:
+          memory: 14Gi
+          cpu: 7
+        limits:
+          memory: 14Gi
+          cpu: 7
+      isScannerBlockedByConfigService: false
+      scannerUser: bigid-scanner
+      port: 8080
+      remoteScannerVaultCustomHeaderName: ""
+      remoteScannerVaultCustomHeaderValue: ""
+      #To export SECUDIR=/etc/scanner/sap set to true
+      set_sap_secudir: false
+      ## By default the oracle connector uses OJDBC version 8. in order to set it to run with version 7 set to true
+      use_ojdbc7: false
+      ## By default the db2 connector uses IBM JCC JDBC 4 Driver. in order to set it to run with JCC JDBC 3 set to true
+      use_db2_jcc3: false
+      ## By default the SAS connector dependencies aren't compiled in the scanner.
+      use_sas: false
+      ##
+      apiCallsLRUSize: 10
+      snippets:
+        batchSize: 500
+
+    ## Default values for labeler section
+    labeler:
+      create: false
+      # Labeling proxy enablement, use httpProxy and httpsProxy
+      # with the following input http/s://<proxy ip>:<proxy port>
+      httpProxy: ""
+      httpsProxy: ""
+      # when enabled, add the certificate named labeler-custom-cert.cert to modules/compose/helm.v3/charts/scanner/certs
+      enableLabelerCustomCert: false
+      retainModificationDate: true
+      image:
+        repository: "bigid-labeler"
+      ## Labeler node selector
+      nodeSelector: {}
+    ## Default values for ner section
+    ner:
+      ## bigid-ner - How to enable NER: https://www.docs.bigid.com/docs/ner-alpha-program#section-2-enable-ner-classifier
+      ## BigiD Ner is a multicontainer pod, includes bigid-scanner and bigid-ner (1:1) where communication in unidirectional; Scanner --> NER
+      create: false
+      port: 8080
+      resources:
+        requests:
+          memory: "3Gi"
+          cpu: "2"
+        limits:
+          memory: "7Gi"
+          cpu: "4"
+      livenessProbe:
+        enabled: true
+      readinessProbe:
+        enabled: true
+      image:
+        repository: "bigid-ner"
+      disableAutoUpgradeClassifiers: ""
+      envForDynaconf: "prod"
+      nerModel: ""
+      nerLogLevel: "INFO"
+      isNerProxy: false
+      httpProxy: ""
+      httpsProxy: ""
+      persistence:
+        enabled: false
+        type: PersistentVolumeClaim # Options: PersistentVolumeClaim, hostPath
+        hostPath: /opt/bigid/ner
+        ## NER data Persistent Volume Storage Class
+        ## If defined, storageClassName: <storageClass>
+        ## If set to "-", storageClassName: "", which disables dynamic provisioning
+        ## If undefined (the default) or set to null, no storageClassName spec is
+        ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+        ##   GKE, AWS & OpenStack)
+        ##
+        storageClass: "standard"
+        # Options: Multiple scanners pods require ReadWriteMany, otherwise use ReadWriteOnce,
+        accessModes:
+          - ReadWriteMany
+        storage: "8Gi"
+
+      volumePermissions:
+        ## @param volumePermissions.enabled Enable init container that changes the owner/group of the PV mount point to `runAsUser:fsGroup`
+        ##
+        enabled: true
+        ## Bitnami Shell image
+        ## ref: https://hub.docker.com/r/bitnami/bitnami-shell/tags/
+        ## @param volumePermissions.image.registry Bitnami Shell image registry
+        ## @param volumePermissions.image.repository Bitnami Shell image repository
+        ## @param volumePermissions.image.tag Bitnami Shell image tag (immutable tags are recommended)
+        ## @param volumePermissions.image.pullPolicy Bitnami Shell image pull policy
+        ## @param volumePermissions.image.pullSecrets Bitnami Shell image pull secrets
+        ##
+        image:
+          registry: docker.io
+          repository: bigid/busybox
+          tag: musl
+          pullPolicy: IfNotPresent
+          ## Optionally specify an array of imagePullSecrets.
+          ## Secrets must be manually created in the namespace.
+          ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+          ## e.g:
+          ## pullSecrets:
+          ##   - myRegistryKeySecretName
+          ##
+          pullSecrets: []
+        ## Init container's resource requests and limits
+        ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
+        ## @param volumePermissions.resources.limits The resources limits for the init container
+        ## @param volumePermissions.resources.requests The requested resources for the init container
+        ##
+        resources:
+          limits: {}
+          requests: {}
+        ## Init container Container Security Context
+        ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+        ## @param volumePermissions.containerSecurityContext.runAsUser Set init container's Security Context runAsUser
+        ## NOTE: when runAsUser is set to special value "auto", init container will try to chown the
+        ##   data folder to auto-determined user&group, using commands: `id -u`:`id -G | cut -d" " -f2`
+        ##   "auto" is especially useful for OpenShift which has scc with dynamic user ids (and 0 is not allowed)
+        ##
+
+    ## Default values for scanner - orchestrator section
+    orchestrator:
+      port: 3001
+
+    # To enable Clustering, you must enable NER as well.
+    clustering:
+      create: false
+
+    ## Default values for scanner - web section
+    web:
+      port: 3000
+
+    ## Default values for scanner section
+    scaler:
+      create: false
+      replicaCount: 1
+      dlStreamName: ""
+      telemetryEnabled: false
+      kinesisEnabled: false
+      scalingCoolDownMinutes: "15"
+      dlRegionName: ""
+      fullnameOverride: ""
+      serviceAccount:
+        annotations: {}
+      image:
+        repository: "bigid-scanner-scaler"
+        tag: ""
+      resources:
+        requests:
+          memory: 256Mi
+          cpu: 200m
+        limits:
+          memory: 2Gi
+          cpu: 1000m
+      scannerController:
+        enabled: false
+      scannerName: "bigid-scanner"
+      scannerGroup: default
+      queueScanPartsThreshold: "30"
+      cpuThreshold: "80"
+      cpuScaleDownThreshold: "20"
+      queueThreshold: "15"
+      minPods: "1"
+      maxPods: "3"
+      threadsActivityHistogramLength: "10"
+      partsSizeQueueHistogramLength: "10"
+      queueHistogramLength: "10"
+      lockTTLMinutes: "15"
+      candidateGraceMinutes: "5"
+      appsManager:
+        nodeSelector: ""
+
+    redis:
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: "1"
+        limits:
+          memory: "2Gi"
+          cpu: "4"
+      host: bigid-cache
+      port: 6379
+      image: bitnami/redis:7.2.4
+      password: ""
+
+    configService:
+      port: 3004
+
+    snippetPersister:
+      create: false

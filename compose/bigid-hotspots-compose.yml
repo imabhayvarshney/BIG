@@ -1,0 +1,58 @@
+version: "3.2"
+
+services:
+  bigid-ml-hotspots:
+    container_name: bigid-ml-hotspots
+    image: bigid/bigid-ml${BIGID_ENV}
+    hostname: bigid-ml
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - MONGO_EXTERNAL_FULL_URL
+      - SECRET_KEY
+      - LOG_LEVEL
+      - SIZE_OF_LOG_IN_BYTES
+      - LOG_BACKUP_NUM
+      - CLUSTERING_WORKER_NAME
+      - CLUSTERING_SERVER_LOG_PATH
+      - CLUSTERING_WORKER_LOG_PATH
+      - CLUSTERING_WORKER_LOG_FILE_NAME
+      - CLUSTERING_SERVER_LOG_FILE_NAME
+      - CLUSTERING_SERVER_LOG_FORMAT
+      - CLUSTERING_WORKER_LOG_GENERAL_FORMAT
+      - CLUSTERING_WORKER_LOG_TASK_FORMAT
+      - CLUSTERING_WORKER_NUMBER_OF_THREADS
+      - CLUSTERING_HTTP_LOG_SUPPORT_FLAG
+      - CLUSTERING_MQ_LOG_QUEUE
+      - CLUSTERING_MQ_TOPIC
+      - MQ_HOST
+      - MQ_USERNAME
+      - MQ_PASSWORD
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - SALT
+      - ENV_FOR_DYNACONF
+      - IS_REMOTE_SCANNER
+      - HOTSPOTS_WORKER_NUMBER_OF_THREADS
+    tty: true
+    entrypoint: /cluster_package/clustering-boot.sh
+    command: -r HOTSPOTS_WORKER
+    restart: always
+
+  bigid-web:
+    environment:
+      - HOTSPOTS_ENABLED=true
+
+  bigid-orch:
+    environment:
+      - HOTSPOTS_ENABLED=true
+
+  bigid-orch2:
+    environment:
+      - HOTSPOTS_ENABLED=true

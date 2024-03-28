@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-metadata-search
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-metadata-search
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.global.bigid.metadataSearch.port }}
+      targetPort: {{ .Values.global.bigid.metadataSearch.port }}
+      name: metadata-search
+  selector:
+    app: bigid-metadata-search

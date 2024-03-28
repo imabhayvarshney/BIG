@@ -1,0 +1,141 @@
+{{- if hasKey .Values.mongodb "archive" }}
+{{- if .Values.mongodb.archive.backup.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongoutil-mongodump
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "1"
+spec:
+  ttlSecondsAfterFinished: 360
+  template:
+    spec:
+      serviceAccountName: {{ .Values.mongodb.archive.serviceAccount }}
+      securityContext:
+        fsGroup: 1001
+      initContainers:
+
+      - name: mongodump-scale-mongo
+        image: bitnami/kubectl
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "--"]
+        args:
+          - |
+            for sts in $(kubectl get statefulsets.apps --output json  | jq --raw-output '.items[].metadata | select (.labels."app.kubernetes.io/name" == "mongodb" or .labels."app.kubernetes.io/name" == "mongodb-sharded") | .name'); do kubectl scale statefulset $sts --replicas=1; done;
+            for dpl in $(kubectl get deploy -l app.kubernetes.io/component=mongos -o jsonpath='{.items[*].metadata.name}'); do kubectl scale deploy $dpl --replicas=1; done;
+            for sts in $(kubectl get statefulsets.apps --output json  | jq --raw-output '.items[].metadata | select (.labels."app.kubernetes.io/name" == "mongodb" or .labels."app.kubernetes.io/name" == "mongodb-sharded") | .name'); do kubectl rollout status statefulset/$sts; done;
+            for dpl in $(kubectl get deploy -l app.kubernetes.io/component=mongos -o jsonpath='{.items[*].metadata.name}'); do kubectl rollout status deploy/$dpl; done;
+
+      - name: mongodump-create
+        image: bitnami/mongodb
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "--"]
+        args:
+        {{- if .Values.mongodb.externalMongo.enabled }}
+          - mongodump --verbose --uri=$(MONGO_EXTERNAL_FULL_URL) --gzip --archive=/dump/mongodump-sharded-${MY_POD_NAMESPACE}-$(date '+%Y%m%d-%H%M%S').tar.gz; echo "Mongodump status - $?"
+        {{- else }}
+          - mongodump --verbose --uri=mongodb://${BIGID_MONGO_USER}:${BIGID_MONGO_PWD}@${BIGID_MONGO_HOST_EXT}:${BIGID_MONGO_PORT} ${SSL:-} --authenticationDatabase=admin --gzip --archive=/dump/mongodump-${MY_POD_NAMESPACE}-$(date '+%Y%m%d-%H%M%S').tar.gz; echo "Mongodump status - $?"
+        {{- end }}
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        env:
+        {{- if .Values.mongodb.tls.enabled }}
+          - name: SSL
+            value: "--ssl --sslPEMKeyFile=/etc/ssl/bigid/client-pem --sslCAFile=/etc/ssl/bigid/mongodb-ca-cert"
+        {{- end }}
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        envFrom:
+          - secretRef:
+              name: mongodb-base-configuration
+        volumeMounts:
+          - name: mongodump
+            mountPath: "/dump"
+        {{- if .Values.mongodb.tls.enabled }}
+          - name: bigid-mongodb-ca
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+        {{- end }}
+
+      - name: mongodump-upload-to-s3
+        image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
+        command: [ "/bin/sh", "-c", "--" ]
+        args:
+          - MONGO_DUMP_FILE=$(find /dump/ -type f -iname "mongodump-*");
+            aws s3 cp ${MONGO_DUMP_FILE:-} s3://${S3_BUCKET_DUMP}/;
+            echo "export MONGO_DUMP_NAME=${MONGO_DUMP_FILE##*/}" > /dump/mongodump.env;
+        envFrom:
+          - secretRef:
+              name: mongodb-base-configuration
+        env:
+          - name: S3_BUCKET_DUMP
+            value: {{ .Values.mongodb.archive.bucket | quote }}
+        {{- if .Values.mongodb.tls.enabled }}
+          - name: SSL
+            value: "--authenticationDatabase=admin --ssl --sslPEMKeyFile=/etc/ssl/bigid/client-pem --sslCAFile=/etc/ssl/bigid/mongodb-ca-cert"
+        {{- end }}
+        volumeMounts:
+          - name: mongodump
+            mountPath: "/dump"
+        {{- if .Values.mongodb.tls.enabled }}
+          - name: bigid-mongodb-ca
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+        {{- end }}
+      containers:
+      {{- if .Values.mongodb.archive.backup.ses.enabled }}
+      - name: mongodump-send-email-notification
+        image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/scripts/mongo_backup_send_email_notification.sh"]
+        envFrom:
+        - secretRef:
+            name: ses-email-notifications-secrets
+        env:
+          - name: NAMESPACE
+            value: {{ .Release.Namespace | quote }}
+          - name: RELEASE
+            value: {{ .Release.Name | quote }}
+          - name: S3_BUCKET_DUMP
+            value: {{ .Values.mongodb.archive.bucket | quote }}
+          - name: SENDER
+            value: {{ .Values.mongodb.archive.backup.ses.sender | quote }}
+        volumeMounts:
+          - name: ses-email-notifications-configmap
+            mountPath: /scripts
+          - name: mongodump
+            mountPath: "/dump"
+      {{- else }}
+      - name: mongodump-send-email-notification
+        image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
+        command: [ "/bin/sh", "-c", "--" ]
+        args:
+          - echo "Notifications by Email are disabled. Nothing to do.";
+      {{- end }}
+      volumes:
+      - name: mongodump
+        emptyDir:
+          sizeLimit: {{ .Values.mongodb.archive.backup.sizeLimit | quote }}
+    {{- if .Values.mongodb.archive.backup.ses.enabled }}
+      - name: ses-email-notifications-configmap
+        configMap:
+          name: ses-email-notifications-configmap
+          defaultMode: 0744
+    {{- end }}
+    {{- if .Values.mongodb.tls.enabled }}
+      - name: bigid-mongodb-ca
+        secret:
+          secretName: bigid-mongodb-ca
+          defaultMode: 420
+    {{- end }}
+      restartPolicy: Never
+  backoffLimit: 1
+...
+{{- end }}
+{{- end }}

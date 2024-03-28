@@ -1,0 +1,3 @@
+{{- if not .Values.global.bigid.scaler.scannerController.enabled }}
+{{- include "scanner.yaml" . }}
+{{- end }}

@@ -1,0 +1,34 @@
+{{- if .Values.global.bigid.scaler.create }}
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scanner-scaler" | quote }}
+  labels:
+    app: update-deployments
+  {{- with .Values.global.bigid.scaler.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scaler-api-access-role" | quote }}
+rules:
+- apiGroups: ["","apps","extensions","metrics.k8s.io"]
+  resources: ["pods", "pods/log", "deployments", "deployments/scale", "services", "serviceaccounts", "secrets"]
+  verbs: ["get", "list", "update", "patch", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "k8s-test-rolebinding" | quote }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scanner-scaler" | quote }}
+roleRef:
+  kind: Role
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scaler-api-access-role" | quote }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

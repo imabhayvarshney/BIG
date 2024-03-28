@@ -1,0 +1,106 @@
+{{- if .Values.global.bigid.orchestrator2.autoscaling.enabled }}
+{{- if $.Capabilities.APIVersions.Has "autoscaling/v2/HorizontalPodAutoscaler" }}
+apiVersion: autoscaling/v2
+{{- else -}}
+apiVersion: autoscaling/v1
+{{- end }}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bigid-orch2
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-orch2
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "orchestrator2.labels" . | nindent 4 }}
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: {{ .Values.global.bigid.orchestrator2.autoscaling.scaleDownPolicy.periodSeconds }}
+        type: Percent
+        value: {{ .Values.global.bigid.orchestrator2.autoscaling.scaleDownPolicy.value }}
+      stabilizationWindowSeconds: {{ .Values.global.bigid.orchestrator2.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bigid-orch2
+  minReplicas: {{ .Values.global.bigid.orchestrator2.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.global.bigid.orchestrator2.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.global.bigid.orchestrator2.autoscaling.targetCPUUtilizationPercentage }}
+  {{- if not .Values.global.bigid.orchestrator2.consumer.autoscaling.enabled }}
+  - type: Object
+    object:
+      metric:
+        name: orch2_queue
+      describedObject:
+        kind: Pod
+        name: '*'
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.averageValue }}
+        type: AverageValue
+        value: "1"
+  - type: Object
+    object:
+      metric:
+        name: orch2_enrichment_findings
+      describedObject:
+        kind: Pod
+        name: '*'
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.averageValue }}
+        type: AverageValue
+        value: "1"
+  - type: Object
+    object:
+      describedObject:
+        kind: Pod
+        name: '*'
+      metric:
+        name: orch2_completed_queue
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.completedQueueThreshold }}
+        type: AverageValue
+        value: "1"
+  - type: Object
+    object:
+      describedObject:
+        kind: Pod
+        name: '*'
+      metric:
+        name: orch2_pii_findings
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.averageValue }}
+        type: AverageValue
+        value: "1"
+  - type: Object
+    object:
+      describedObject:
+        kind: Pod
+        name: '*'
+      metric:
+        name: orch2_classification_findings
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.averageValue }}
+        type: AverageValue
+        value: "1"
+  - type: Object
+    object:
+      describedObject:
+        kind: Pod
+        name: '*'
+      metric:
+        name: orch2_object_diff_dsinsight
+      target:
+        averageValue: {{ .Values.global.bigid.orchestrator2.autoscaling.averageValue }}
+        type: AverageValue
+        value: "1"
+{{- end }}
+{{- end }}

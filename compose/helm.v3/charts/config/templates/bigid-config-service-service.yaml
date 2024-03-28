@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-config-service
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-config-service
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.global.bigid.configService.port }}
+      targetPort: {{ .Values.global.bigid.configService.port }}
+      name: http
+  selector:
+    app: bigid-config-service

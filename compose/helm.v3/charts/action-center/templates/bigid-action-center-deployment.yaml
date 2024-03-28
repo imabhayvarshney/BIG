@@ -1,0 +1,194 @@
+{{- if .Values.global.bigid.actionCenter.create -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-action-center
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-action-center
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "action-center.labels" . | nindent 4 }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.actionCenter.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-action-center
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.actionCenter.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.actionCenter.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.actionCenter.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-action-center
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccount: bigid-action-center
+      automountServiceAccountToken: false
+      initContainers:
+      - name: init-config-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until wget -q --spider http://bigid-config-service:{{ .Values.global.bigid.configService.port }}/actuator/health; do echo waiting for bigid-config-service; sleep 3; done"]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      - name: init-redis
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until nc -zv -w1 $(BIGID_REDIS_HOST) $(BIGID_REDIS_PORT); do echo waiting for bigid-cache; sleep 3; done"]
+        envFrom:
+        - configMapRef:
+            name: global-configuration
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.global.bigid.tenantService.create }}
+      - name: init-tenant-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-tenant-service:{{ .Values.global.bigid.tenantService.port }}/api/v1/tenant-service/health; do echo waiting for bigid-tenant-service; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      containers:
+      - name: bigid-action-center
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.actionCenter.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /api/v1/action-center/health
+            port: {{ .Values.global.bigid.actionCenter.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v1/action-center/health
+            port: {{ .Values.global.bigid.actionCenter.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.global.bigid.actionCenter.resources | nindent 10 }}
+        ports:
+          - containerPort: {{ .Values.global.bigid.actionCenter.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-node-configuration
+        - configMapRef:
+            name: global-configuration
+        env:
+          - name: SCALABLE_HEALTH_CHECK_ENABLED
+            value: "{{ .Values.global.bigid.scalableHealthCheck.enabled }}"
+          - name: FEEDBACK_LOOP_FF
+            value: "{{ .Values.global.bigid.feedbackLoop.enabled }}"
+          - name: IS_FIPS_MODE
+            value: {{ .Values.global.fips.enabled | quote }}
+          - name: USE_DISPLAY_NAME_FOR_POLICY_FF
+            value: {{ .Values.global.bigid.useDisplayNameForPolicyFF | quote }}
+          - name: LOG_LEVEL
+            value: {{ .Values.global.bigid.actionCenter.logLevel | quote }}
+          - name: MULTI_TENANT_CONFIG_ENABLED
+            value: {{ .Values.global.bigid.configService.multiTenantConfigEnabled | quote }}
+          - name: DISABLE_SERVICES_LOGS
+            value: {{ .Values.global.bigid.shouldDisableLogs | quote }}
+          - name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "bigid.secretKey" . }}
+                key: secretKey
+          - name: SECRET_SALT
+            valueFrom:
+              secretKeyRef:
+                name: secret-key
+                key: secretSalt
+          - name: BIGID_MQ_USER
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: rabbitmq-user
+          - name: BIGID_MQ_PWD
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: rabbitmq-pass
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: redis-pass
+          - name: USE_SAAS
+            value: "{{ .Values.global.bigid.useSaas.enabled }}"
+          - name: MULTI_TENANT_MODE_ENABLED
+            value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+          {{- if .Values.global.extraEnvVars }}
+          {{- .Values.global.extraEnvVars | toYaml | nindent 10 }}
+          {{- end }}
+          {{- with .Values.global.bigid.actionCenter.extraEnvVars }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        volumeMounts:
+          - name: bigid-mongodb-ca
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+          {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+      volumes:
+        - name: bigid-mongodb-ca
+          secret:
+            secretName: bigid-mongodb-ca
+            defaultMode: 420
+        {{- with .Values.global.extraVolumes }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

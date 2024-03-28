@@ -1,0 +1,47 @@
+{{- if hasKey .Values.mongodb "archive" }}
+{{- if .Values.mongodb.archive.backup.ses.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ses-email-notifications-configmap
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+data:
+  mongo_backup_send_email_notification.sh: |
+    #!/bin/sh
+
+    set -e
+
+    export AWS_ACCESS_KEY_ID="${SES_AWS_ACCESS_KEY_ID}"
+    export AWS_SECRET_ACCESS_KEY="${SES_AWS_SECRET_ACCESS_KEY}"
+
+    set -x
+
+    source /dump/mongodump.env
+
+    message_body="$(cat <<EOF
+    From: ${SENDER}
+    To: ${SES_RECIPIENT}
+    Subject: Jenkins CD - Successfully created your MongoDB dump archive
+    MIME-Version: 1.0
+    Content-type: Multipart/Mixed; boundary=\"NextPart\"
+
+    --NextPart
+    Content-Type: text/plain
+
+    Release: ${RELEASE}
+    Namespace: ${NAMESPACE}
+
+    Your mongo backup was successfully created and uploaded to the \"${S3_BUCKET_DUMP}\" S3 bucket.
+    Archive name: ${MONGO_DUMP_NAME}
+
+    --NextPart--
+    EOF
+    )"
+    message_body="$(echo "${message_body}" | awk '{printf "%s\\n", $0}')"
+    echo "{\""Data"\": \"${message_body}\"}" > message.json
+
+    aws ses send-raw-email --raw-message file://message.json --cli-binary-format raw-in-base64-out
+
+{{- end }}
+{{- end }}

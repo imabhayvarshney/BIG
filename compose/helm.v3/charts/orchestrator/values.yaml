@@ -1,0 +1,95 @@
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  bigid:
+    ## @param global.bigid.containerSecurityContext Security Context for BigID containers
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsGroup: 1001
+    ## @param global.bigid.podSecurityContext Security Context for BigID pods
+    podSecurityContext:
+      enabled: false
+      runAsUser: 1001
+      runAsGroup: 1001
+    saasEnv: "staging"
+    orchestrator:
+      image:
+        repository: "bigid-orch"
+      environmentFF: "prod"
+      serviceAccount:
+        create: true
+        annotations: {}
+      dynamicModifyParsingThreadsFF: true
+      port: 3001
+      autoRetryScanPartsFF: true
+      classificationNewFlow: true
+      bigIDScanSchedulerEnabled: true
+      nodeOptions: ""
+      nodeMaxOldSpaceSizePercent: 85
+      scanPartsStartupExecutorEnabled: false
+      shouldAutoRegisterApps: true
+      metadataUpdateBulkEnabled: false
+      metadataUpdateBulkSize: 40
+      structuredClassificationSamplingEnabled: false
+      metadataUpdateBackpressure: false
+      migrateToScanPageStateFF: true
+      correlationSetsInfrastructureEnabled: false
+      cacheFindingsFilterTTLSec: 604800
+      terminationGracePeriodSeconds: 120
+      scalableDeletion:
+        enabled: false
+      scalablePiiFindingsDeletion:
+        enabled: false
+      gDriveLabelImporterV2: false
+      enableSseOnMlFF: true
+      classifierSuperscanPrefiltering:
+        enabled: false
+      labelingImportMaxIdleTimeMinutes: 30
+      labelingPartsMaxIdleTimeMinutes: 360
+      enableHandleStuckLabelingScans: true
+      disableWideClassifiers: false
+      accessRemediationSmbV2Enabled: false
+      enableRiskDefaultFieldsInit: true
+      applicationsCredentialsKey: ""
+      hyperScanAutoFallbackEnabled: true
+      objectProfilingBiEvents: false
+      correlationRecoverySchedulerFlag: false
+      appTerminationGracePeriodSeconds: "115"
+      enableReleaseStuckPartsInCacheFF: true
+      redisQueuedScanPartsMaxIdleTimeMinutesFF: 360
+      scanWindowSchedulerEnabledFF: false
+      replicaCount: 1
+      logLevel: trace
+      podAnnotations: {}
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+      extraEnvVars: []
+      sendgridApiKey: ""
+      newCredentialsFlow:
+        enabled: false
+      readinessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+      livenessProbe:
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 10
+        successThreshold: 1
+        failureThreshold: 8

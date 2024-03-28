@@ -1,0 +1,46 @@
+{{- if ( hasKey .Values.global.bigid "generateToken") }}
+{{- if .Values.global.bigid.generateToken.enabled | default false }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-jwt-{{ randAlphaNum 5 | lower }}
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  backoffLimit: 2
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: token-sa
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      initContainers:
+        - name: init-web
+          image: {{ template "initContainer.image" . }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          command: ['sh', '-c', "until wget -q --spider http://bigid-web:3000/health/readiness; do echo waiting for bigid-web; sleep 3; done"]
+          resources:
+            {{- toYaml .Values.global.initContainers.resources | nindent 12 }}
+      containers:
+      - name: gen-token
+        args:
+        - "main.py"
+        image: "{{ .Values.global.image.repository }}/generate-token{{ template "bigid.armRepository" . }}:release-4"
+        imagePullPolicy: Always
+        env:
+        - name: BIGID_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "bigid.secretKey" . }}
+              key: secretKey
+        - name: NAMESPACE
+          value: "{{ .Release.Namespace }}"
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+ {{- end }}
+ {{- end }}

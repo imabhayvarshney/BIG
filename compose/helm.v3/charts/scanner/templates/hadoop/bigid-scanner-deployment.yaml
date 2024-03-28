@@ -1,0 +1,5 @@
+{{- if not .Values.global.bigid.scaler.scannerController.enabled }}
+{{- if .Values.global.bigid.scanner.hadoop.create }}
+{{- include "hadoop.yaml" . }}
+{{- end }}
+{{- end }}

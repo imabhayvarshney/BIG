@@ -1,0 +1,133 @@
+enabled: false
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## @param podAnnotations Annotations for BigiD pods
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  imagePullSecret: []
+  bigid:
+    generateToken:
+      enabled: false
+  additionalLabels: {}
+  podLabels: {}
+
+replicaCount: 1
+
+image:
+  registry: 656782941097.dkr.ecr.us-east-1.amazonaws.com
+  repository: bigexchange/bigid-remediation/batch-process
+  pullPolicy: IfNotPresent
+  tag: "3.10.0.174"
+
+ui:
+  image:
+    repository: bigexchange/bigid-remediation/ui-bff
+
+nameOverride: ""
+fullnameOverride: ""
+
+bigid:
+  #Set this true to use the refresh token instead for username&password for authentication
+  USE_REFRESH_TOKEN: "true"
+  #Set the token when USE_REFRESH_TOKEN is true
+  BIGID_REFRESH_TOKEN: ""
+  BIGID_USERNAME: "toBeFilled"
+  BIGID_PASSWORD: "toBeFilled"
+  OVERWRITE_REFRESH_TOKEN_WITH_DB: "false"
+
+
+#MONGO DB PARAMETERS
+mongodb:
+  MONGODB_SSL: false
+  #Ex:- Mongo connection string with SSL "mongodb://username:password@host:port/?readPreference=primary&tls=true"
+  #Ex:- Mongo connection string without SSL "mongodb://username:password@host:port/?readPreference=primary"
+  MONGODB_ENABLE_INSECURE_CONNECTION: false
+  MONGODB_SSL_KEYSTORE: "/opt/remediation/conf/mongossl/client.jks"
+  MONGODB_SSL_KEYSTORE_PASSWORD: "password"
+  MONGODB_SSL_TRUSTSTORE: "/opt/remediation/conf/mongossl/truststore.jks"
+  MONGODB_SSL_TRUSTSTORE_PASSWORD: "password"
+  mongoUri: "bigid-remediation?authSource=admin&replicaSet=bigid-replica-set"
+  ## Fill in the complete MongoDB connection string in the standard format to establish a full connection.
+  ## Example: "mongodb://<username>:<password>@<host>:<port>/<database>?<options>"
+  mongoFullUrl: ""
+#APPLICATION PARAMETERS
+remediation:
+  #JVM PARAMETERS
+  JVM_MEM_MIN: "-Xms2g"
+  JVM_MEM_MAX: "-Xmx4g"
+  #If set to true, the Remediation Data Base will be dropped and recreated during upgrade.
+  DROP_DB_ON_INSTALL_UPGRADE: false
+  #TIME ZONE
+  TZ:
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   memory: 4096Mi
+  #   cpu: 2000m
+  requests:
+    memory: 2048Mi
+    cpu: 1000m
+
+service:
+  type: ClusterIP
+
+livenessProbe:
+  enabled: true
+  path: /
+  port: 9443
+  batchPort: 8444
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  path: /
+  port: 9443
+  batchPort: 8444
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+  successThreshold: 1
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+  # bigid-actions.logs: '[{"source": "java", "service": "actions"}]'
+
+containerSecurityContext:
+  enabled: false
+
+podSecurityContext:
+  enabled: false
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000

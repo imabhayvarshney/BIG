@@ -1,0 +1,41 @@
+{{- if and .Values.global.bigid.clustering.create .Values.global.bigid.clustering.hotspots.autoscaling.enabled -}}
+{{- if $.Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: bigid-ml-hotspots
+  labels:
+    deploymentName: bigid-ml-hotspots
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-ownership: "true"
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: bigid-ml-hotspots
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: {{ .Values.global.bigid.clustering.hotspots.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+          policies:
+          - type: Percent
+            value: {{ .Values.global.bigid.clustering.hotspots.autoscaling.scaleDownPolicy.value }}
+            periodSeconds: {{ .Values.global.bigid.clustering.hotspots.autoscaling.scaleDownPolicy.periodSeconds }}
+  maxReplicaCount: {{ .Values.global.bigid.clustering.hotspots.autoscaling.maxReplicas }}
+  minReplicaCount: {{ .Values.global.bigid.clustering.hotspots.autoscaling.minReplicas }}
+  pollingInterval: 30
+  cooldownPeriod:  {{ .Values.global.bigid.clustering.hotspots.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+  scaleTargetRef:
+    name: bigid-ml-hotspots
+  triggers:
+    - type: rabbitmq
+      metadata:
+        mode: QueueLength # QueueLength or MessageRate
+        value: {{ .Values.global.bigid.clustering.hotspots.autoscaling.averageValue | quote }} # message backlog or publish/sec. target per instance
+        queueName: ^(clustering.hotspots_tasks.queue)$
+        useRegex: "true"
+        vhostName: /
+        timeout: "120"
+      authenticationRef:
+        name: bigid-ml-trigger-auth
+{{- end }}
+{{- end }}

@@ -1,0 +1,44 @@
+{{- if .Values.global.bigid.dataCatalogConsumer.create -}}
+{{- if .Values.global.bigid.dataCatalogConsumer.autoscaling.enabled -}}
+{{- if $.Capabilities.APIVersions.Has "keda.sh/v1alpha1" }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: bigid-data-catalog-consumer
+  labels:
+    deploymentName: bigid-data-catalog-consumer
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-ownership: "true"
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: bigid-data-catalog-consumer
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+          policies:
+          - type: Percent
+            value: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.scaleDownPolicy.value }}
+            periodSeconds: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.scaleDownPolicy.periodSeconds }}
+  maxReplicaCount: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.maxReplicas }}
+  minReplicaCount: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.minReplicas }}
+  pollingInterval: 30
+  cooldownPeriod:  {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+  scaleTargetRef:
+    name: bigid-data-catalog-consumer
+  triggers:
+    - type: rabbitmq
+      metadata:
+        mode: QueueLength # QueueLength or MessageRate
+        value: {{ .Values.global.bigid.dataCatalogConsumer.autoscaling.averageValue | quote }} # message backlog or publish/sec. target per instance
+        activationValue: "1" # Optional. Activation threshold
+        queueName: ^(?!catalog\.object\.scan\.completed.*$)catalog.*
+        useRegex: "true"
+        vhostName: /
+        timeout: "120"
+      authenticationRef:
+        name: bigid-data-catalog-consumer-trigger-auth
+{{- end }}
+{{- end }}
+{{- end }}

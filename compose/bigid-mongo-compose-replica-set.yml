@@ -1,0 +1,31 @@
+version: '3.2'
+
+volumes:
+  bigid-mongo-data:
+    external: true
+
+services:
+
+  bigid-mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - bigid-mongo-data:/data/db
+    container_name: bigid-mongo
+    entrypoint:
+      - mongod
+      - --auth
+      - --bind_ip_all
+      - --replSet=bigid-replica-set
+      - --keyFile=/data/db/replica-set.key
+    extra_hosts:
+      - bigid-mongo:127.0.0.1
+    environment:
+      - TZ
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+    restart: always

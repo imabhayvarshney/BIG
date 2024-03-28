@@ -1,0 +1,11 @@
+{{- if .Values.global.bigid.scanner.scannerDb2LicenseFile }}
+{{- if .Values.global.bigid.scanner.hadoop.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hadoop-db2license
+  namespace: {{ .Release.Namespace | quote }}
+binaryData:
+  db2jcc_license_cisuz.jar: {{ .Values.global.bigid.scanner.scannerDb2LicenseFile }}
+{{- end }}
+{{- end }}

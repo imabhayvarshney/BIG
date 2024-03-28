@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: bigid-mq
+  name: bigid-mq
+spec:
+  serviceName: "bigid-mq"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bigid-mq
+  template:
+    metadata:
+      labels:
+         app: bigid-mq
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9419"
+    spec:
+      containers:
+      - image: "{{ .Values.global.image.repository }}/rabbitmq:ubi-3.8"
+        imagePullPolicy: Always
+        name: bigid-mq
+        ports:
+        - containerPort: {{ .Values.global.bigid.rabbitmq.ports.mgmt }}
+        - containerPort: {{ .Values.global.bigid.rabbitmq.ports.amqpSecure }}
+        - containerPort: {{ .Values.global.bigid.rabbitmq.ports.amqp }}
+        env:
+        - name: RABBITMQ_CONFIG_FILE
+          value: /etc/rabbitmq/config/rabbitmq
+        resources:
+         requests:
+           memory: {{ .Values.global.bigid.rabbitmq.resources.requests.memory }}
+           cpu: {{ .Values.global.bigid.rabbitmq.resources.requests.cpu }}
+         limits:
+           memory: {{ .Values.global.bigid.rabbitmq.resources.limits.memory }}
+           cpu: {{ .Values.global.bigid.rabbitmq.resources.limits.cpu }}
+      # - name: TZ
+      #   value: "$TZ"
+        livenessProbe:
+          exec:
+            command:
+            - rabbitmqctl
+            - status
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 20
+        volumeMounts:
+        - name: bigid-mq-data
+          mountPath: /etc/rabbitmq/config
+          readOnly: false
+        - name: bigid-mq-plugins
+          mountPath: /etc/rabbitmq
+          readOnly: false
+        - name: mq-tls
+          mountPath: /etc/rabbitmq/certfiles
+      volumes:
+        - name: mq-tls
+          secret:
+            secretName: bigid-mq-secrets
+            defaultMode: 420
+        - configMap:
+            name: mq-config
+            defaultMode: 420
+            items:
+            - key: rabbitmq.config
+              path: rabbitmq.config
+            - key: definitions.json
+              path: definitions.json
+          name: bigid-mq-data
+        - configMap:
+            name: mq-config
+            defaultMode: 420
+            items:
+            - key: enabled_plugins
+              path: enabled_plugins
+          name: bigid-mq-plugins
+      imagePullSecrets:
+      - name: registrypullsecret
+      restartPolicy: Always

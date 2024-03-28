@@ -1,0 +1,38 @@
+{{- if .Values.global.bigid.web.autoscaling.enabled }}
+{{- if $.Capabilities.APIVersions.Has "autoscaling/v2/HorizontalPodAutoscaler" }}
+apiVersion: autoscaling/v2
+{{- else -}}
+apiVersion: autoscaling/v1
+{{- end }}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bigid-web
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-web
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "web.labels" . | nindent 4 }}
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: {{ .Values.global.bigid.web.autoscaling.scaleDownPolicy.periodSeconds }}
+        type: Percent
+        value: {{ .Values.global.bigid.web.autoscaling.scaleDownPolicy.value }}
+      stabilizationWindowSeconds: {{ .Values.global.bigid.web.autoscaling.scaleDownPolicy.stabilizationWindowSeconds }}
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bigid-web
+  minReplicas: {{ .Values.global.bigid.web.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.global.bigid.web.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.global.bigid.web.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

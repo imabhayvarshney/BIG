@@ -1,0 +1,259 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-metadata-search
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-metadata-search
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.metadataSearch.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-metadata-search
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.metadataSearch.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.metadataSearch.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.metadataSearch.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-metadata-search
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-mdsearch.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-mdsearch.service: bigid-mdsearch
+        tags.datadoghq.com/service: "bigid-mdsearch"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      serviceAccount: bigid-metadata-search
+      automountServiceAccountToken: false
+      initContainers:
+      {{- if .Values.global.bigid.tenantService.create }}
+      - name: init-tenant-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-tenant-service:{{ .Values.global.bigid.tenantService.port }}/api/v1/tenant-service/health; do echo waiting for bigid-tenant-service; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      - name: init-orchestrator2
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-orch2:{{ .Values.global.bigid.orchestrator2.port }}/health; do echo waiting for bigid-orch2; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      containers:
+      - name: bigid-metadata-search
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.metadataSearch.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /api/v1/metadata-search/health-check
+            port: {{ .Values.global.bigid.metadataSearch.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v1/metadata-search/health-check
+            port: {{ .Values.global.bigid.metadataSearch.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        ports:
+         - containerPort: {{ .Values.global.bigid.metadataSearch.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-java-configuration
+        - configMapRef:
+            name: global-configuration
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.global.bigid.metadataSearch.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-mdsearch.env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-mdsearch.service']
+        {{- end }}
+        - name: USE_SAAS
+          value: "{{ .Values.global.bigid.useSaas.enabled }}"
+        - name: DL_STREAM_NAME
+          value: "{{ .Values.global.bigid.dataLakeClient.dlStreamName }}"
+        - name: IS_FIPS_MODE
+          value: {{ .Values.global.fips.enabled | quote }}
+        - name: BIGID_ORCH_HOST
+          value: "bigid-orch"
+        - name: MULTI_TENANT_MODE_ENABLED
+          value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+        - name: BIGID_ORCH_PORT
+          value: "{{ .Values.global.bigid.orchestrator.port }}"
+        - name: BIGID_ORCH_PROTOCOL
+          value: http
+        - name: BIGID_ORCH2_HOST
+          value: "bigid-orch2"
+        - name: BIGID_ORCH2_PORT
+          value: "{{ .Values.global.bigid.orchestrator2.port }}"
+        - name: BIGID_CACHE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: redis-pass
+        - name: BIGID_UI_PORT
+          value: "{{ .Values.global.bigid.web.port }}"
+        - name: BIGID_UI_PROTOCOL_EXT
+          value: "http"
+        - name: BIGID_UI_HOST_EXT
+          value: "bigid-web"
+        - name: BIGID_ELASTICSEARCH_USER
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: BIGID_ELASTICSEARCH_USER
+        - name: BIGID_ELASTICSEARCH_PWD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: BIGID_ELASTICSEARCH_PWD
+        - name: BIGID_TENANT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: global-configuration
+              key: BIGID_ELASTICSEARCH_TENANT_ID
+        - name: JDK_JAVA_OPTIONS
+          value: {{ printf "$(JAVA_APM_OPTS) %s" (include "java.calcHeapSize" .Values.global.bigid.metadataSearch) | quote }}
+        - name: BIGID_APP_ACCESS_TOKEN
+          value: "{{ .Values.global.bigid.metadataSearch.appAccessToken }}"
+        - name: SCALABLE_HEALTH_CHECK_ENABLED
+          value: "{{ .Values.global.bigid.scalableHealthCheck.enabled }}"
+        - name: BIGID_ELASTICSEARCH_SSL_CERT_PATH
+          value: "{{ .Values.global.bigid.metadataSearch.sslCertPath }}"
+        - name: SHOULD_GENERATE_AND_STORE_MONGO_CREDS_FF
+          value: {{ .Values.global.bigid.multiTenantMode.generateAndUseMongoCreds | quote }}
+        - name: DISABLE_SERVICES_LOGS
+          value: {{ .Values.global.bigid.shouldDisableLogs | quote }}
+        - name: MDSEARCH_CATALOG_UPLOADER_THREADS
+          value: "{{ .Values.global.bigid.metadataSearch.catalogUploaderThreads }}"
+        - name: MDSEARCH_UPLOADER_BULK_SIZE
+          value: "{{ .Values.global.bigid.metadataSearch.uploaderBulkSize }}"
+        - name: MONITOR_DISCREPANCIES_CRON_SCHEDULE
+          value: "{{ .Values.global.bigid.metadataSearch.monitorDiscrepancies.cronSchedule }}"
+        - name: MONITOR_DISCREPANCIES_RATIO_THRESHOLD
+          value: "{{ .Values.global.bigid.metadataSearch.monitorDiscrepancies.ratioThreshold }}"
+        - name: MONITOR_DISCREPANCIES_NUMBER_OF_OBJECTS_THRESHOLD
+          value: "{{ .Values.global.bigid.metadataSearch.monitorDiscrepancies.numberOfObjectsThreshold }}"
+        resources:
+          {{- toYaml .Values.global.bigid.metadataSearch.resources | nindent 10 }}
+        volumeMounts:
+          {{- if .Values.global.fips.enabled }}
+          - name: mq-tls
+            mountPath: /tmp/rabbitcerts
+          {{- end }}
+          - name: ssl-secrets
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+          - name: es-ssl
+            mountPath: /tmp/escerts
+          {{- with .Values.global.extraVolumeMounts }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+      volumes:
+        {{- if .Values.global.fips.enabled }}
+        - name: mq-tls
+          secret:
+            secretName: bigid-mq-secrets
+            defaultMode: 420
+            items:
+              - key: client.cert
+                path: client.cert
+        {{- end }}
+        - name: es-ssl
+          secret:
+            secretName: bigid-elasticsearch-crt
+            defaultMode: 420
+            optional: true
+            items:
+              - key: ca.crt
+                path: ca.crt
+        - name: ssl-secrets
+          projected:
+            sources:
+            - secret:
+                name: mongo-ssl-truststore-secrets
+        {{- with .Values.global.extraVolumes }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

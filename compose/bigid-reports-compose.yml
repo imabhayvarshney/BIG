@@ -1,0 +1,19 @@
+version: '3.2'
+
+services:
+  bigid-reports:
+    image: bigid/bigid-reports${BIGID_ENV}
+    ports:
+      - "${REPORTS_PORT:-3005}:${REPORTS_PORT:-3005}"
+    container_name: bigid-reports
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - PORT=${REPORTS_PORT:-3005}
+      - LOG_LEVEL
+      - IS_PART_OF_BIGID=true
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+    hostname: bigid-reports
+    restart: always

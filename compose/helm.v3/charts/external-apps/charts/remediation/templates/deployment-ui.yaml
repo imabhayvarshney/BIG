@@ -1,0 +1,176 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-remediation-ui-bff
+  labels:
+    app: bigid-remediation-ui-bff
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-remediation-ui-bff
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-remediation-ui-bff
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "remediation.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      containers:
+      - name: bigid-remediation-ui-bff
+        args:
+          - /opt/bigid-remediation-ui-bff.sh
+        {{- if .Values.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        image: "{{ .Values.image.registry }}/{{ .Values.ui.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: "{{ .Values.global.image.pullPolicy }}"
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.livenessProbe.path }}
+            port: {{ .Values.livenessProbe.port }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.readinessProbe.path }}
+            port: {{ .Values.readinessProbe.port }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        ports:
+          - containerPort: 9443
+          - containerPort: 8443
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-node-configuration
+        env:
+        - name: JVM_MEM_MIN
+          value: "{{ .Values.remediation.JVM_MEM_MIN }}"
+        - name: JVM_MEM_MAX
+          value: "{{ .Values.remediation.JVM_MEM_MAX }}"
+        {{- if eq (.Values.global.bigid.ui.service.port | int ) 443 }}
+        - name: BIGID_BASE_URL
+          value: "https://bigid-ui:443"
+        {{- else }}
+        - name: BIGID_BASE_URL
+          value: "http://bigid-ui"
+        {{- end }}
+        - name: USE_REFRESH_TOKEN
+          value: "{{ .Values.bigid.USE_REFRESH_TOKEN }}"
+        {{- if .Values.global.bigid.generateToken.enabled | default false }}
+        - name: BIGID_REFRESH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: bigid-jwt-token
+              key: token
+              optional: true
+        {{- else }}
+        - name: BIGID_REFRESH_TOKEN
+          value: "{{ .Values.bigid.BIGID_REFRESH_TOKEN }}"
+        {{- end }}
+        - name: BIGID_USERNAME
+          value: "{{ .Values.bigid.BIGID_USERNAME }}"
+        - name: BIGID_PASSWORD
+          value: "{{ .Values.bigid.BIGID_PASSWORD }}"
+        - name: BFF_URL
+          value: "http://bigid-remediation-ui-bff:8443"
+        - name: BATCH_URL
+          value: "http://bigid-remediation-batch:8444"
+        - name: OVERWRITE_REFRESH_TOKEN_WITH_DB
+          value: "{{ .Values.bigid.OVERWRITE_REFRESH_TOKEN_WITH_DB }}"
+        - name: MONGODB_SSL
+          value: "{{ .Values.mongodb.MONGODB_SSL }}"
+        - name: MONGODB_CONNECTION_STRING
+        {{- if .Values.mongodb.mongoFullUrl }}
+          value: {{ .Values.mongodb.mongoFullUrl | quote }}
+        {{- else }}
+          value: 'mongodb://$(BIGID_MONGO_USER):$(BIGID_MONGO_PWD)@$(BIGID_MONGO_HOST_EXT):$(BIGID_MONGO_PORT)/{{ .Values.mongodb.mongoUri }}&ssl=$(BIGID_MONGO_SSL)&tlsAllowInvalidHostnames=$(BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION)'
+          {{- end }}
+        {{- if .Values.mongodb.MONGODB_SSL }}
+        - name: MONGODB_ENABLE_INSECURE_CONNECTION
+          value: "{{ .Values.mongodb.MONGODB_ENABLE_INSECURE_CONNECTION }}"
+        - name: MONGODB_SSL_KEYSTORE
+          value: "{{ .Values.mongodb.MONGODB_SSL_KEYSTORE }}"
+        - name: MONGODB_SSL_KEYSTORE_PASSWORD
+          value: "{{ .Values.mongodb.MONGODB_SSL_KEYSTORE_PASSWORD }}"
+        - name: MONGODB_SSL_TRUSTSTORE
+          value: "{{ .Values.mongodb.MONGODB_SSL_TRUSTSTORE }}"
+        - name: MONGODB_SSL_TRUSTSTORE_PASSWORD
+          value: "{{ .Values.mongodb.MONGODB_SSL_TRUSTSTORE_PASSWORD }}"
+        {{- end }}
+        - name: ENABLE_SERVER_SSL
+          value: "false"
+        - name: DROP_DB_ON_INSTALL_UPGRADE
+          value: "{{ .Values.remediation.DROP_DB_ON_INSTALL_UPGRADE }}"
+        - name: TZ
+          value: "{{ .Values.remediation.TZ }}"
+        volumeMounts:
+        {{- if .Values.mongodb.MONGODB_SSL }}
+        - name: mongo-ssl-remediation-truststore-secrets
+          mountPath: /opt/remediation/conf/mongossl
+          readOnly: true
+        {{- end }}
+        workingDir: /opt/remediation/
+      volumes:
+      {{- if .Values.mongodb.MONGODB_SSL }}
+      - name: mongo-ssl-remediation-truststore-secrets
+        secret:
+          secretName: mongo-ssl-truststore-secrets
+          defaultMode: 420
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,144 @@
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  podAnnotations: {}
+
+  bigid:
+    clustering:
+      image:
+        repository: "bigid-ml"
+      celeryControlDisabled: false
+      serviceAccount:
+        create: true
+        annotations: {}
+      worker:
+        replicaCount: 1
+        autoscaling:
+          enabled: false
+          minReplicas: 0
+          maxReplicas: 1
+          averageValue: 1
+          scaleDownPolicy:
+            stabilizationWindowSeconds: 300
+            periodSeconds: 300
+            value: 10
+        podAnnotations: {}
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "500m"
+          limits:
+            memory: "6Gi"
+            cpu: "3"
+        skipCheck:
+          - CKV_K8S_8="No Liveness Probe"
+          - CKV_K8S_9="No Readiness Probe"
+        securityContext:
+          # capabilities:
+          #   drop:
+          #   - ALL
+          #   - NET_RAW
+          # # readOnlyRootFilesystem: true
+          # allowPrivilegeEscalation: false
+          # runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+        extraEnvVars: []
+      scheduler:
+        replicaCount: 1
+        autoscaling:
+          enabled: false
+          minReplicas: 0
+          maxReplicas: 1
+          averageValue: 1
+          scaleDownPolicy:
+            stabilizationWindowSeconds: 300
+            periodSeconds: 300
+            value: 10
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        podAnnotations: {}
+        skipCheck:
+          - CKV_K8S_8="No Liveness Probe"
+          - CKV_K8S_9="No Readiness Probe"
+        securityContext:
+          # capabilities:
+          #   drop:
+          #   - ALL
+          #   - NET_RAW
+          # # readOnlyRootFilesystem: true
+          # allowPrivilegeEscalation: false
+          # runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+        extraEnvVars: []
+      gateway:
+        replicaCount: 1
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "500m"
+          limits:
+            memory: "5Gi"
+            cpu: "2"
+        port: 3300
+        podAnnotations: {}
+        securityContext:
+          # capabilities:
+          #   drop:
+          #   - ALL
+          #   - NET_RAW
+          # # readOnlyRootFilesystem: true
+          # allowPrivilegeEscalation: false
+          # runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+        extraEnvVars: []
+      hotspots:
+        replicaCount: 1
+        autoscaling:
+          enabled: false
+          minReplicas: 0
+          maxReplicas: 1
+          averageValue: 1
+          scaleDownPolicy:
+            stabilizationWindowSeconds: 300
+            periodSeconds: 300
+            value: 10
+        resources:
+          requests:
+            memory: 500Mi
+            cpu: 500m
+          limits:
+            memory: 6Gi
+            cpu: 3
+        podAnnotations: {}
+        skipCheck:
+          - CKV_K8S_8="No Liveness Probe"
+          - CKV_K8S_9="No Readiness Probe"
+        securityContext:
+          # capabilities:
+          #   drop:
+          #   - ALL
+          #   - NET_RAW
+          # # readOnlyRootFilesystem: true
+          # allowPrivilegeEscalation: false
+          # runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+        extraEnvVars: []

@@ -1,0 +1,34 @@
+{{- if .Values.global.bigid.confluent.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-confluent
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-confluent
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ports:
+  - name: zookeeper
+    port: {{ .Values.global.bigid.confluent.ports.zookeeper }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.zookeeper }}
+  - name: landoop-ui
+    port: {{ .Values.global.bigid.confluent.ports.landoop }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.landoop }}
+  - name: kafka-broker
+    port: {{ .Values.global.bigid.confluent.ports.kafka }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.kafka }}
+  - name: rest
+    port: {{ .Values.global.bigid.confluent.ports.rest }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.rest }}
+  - name: registry
+    port: {{ .Values.global.bigid.confluent.ports.registry }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.registry }}
+  - name: jmx
+    port: {{ .Values.global.bigid.confluent.ports.jmx }}
+    targetPort: {{ .Values.global.bigid.confluent.ports.jmx }}
+  selector:
+    app: bigid-confluent
+{{- end }}

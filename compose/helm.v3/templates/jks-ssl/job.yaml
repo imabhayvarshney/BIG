@@ -1,0 +1,65 @@
+{{- if and (.Values.mongodb.tls.enabled) (.Values.mongodb.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-certs-job-{{ randAlphaNum 5 | lower }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    helm.sh/hook-weight: "3"
+  labels:
+    app: mongodb-certs-job
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  template:
+    spec:
+      volumes:
+      - name: tls
+        secret:
+          secretName: mongodb-self-signed-certs
+      restartPolicy: OnFailure
+      serviceAccountName: mongodb-certs-job
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      containers:
+      - name: mongodb-certs-job
+        image: "{{ .Values.global.image.repository }}/jks:1.1.0"
+        command:
+          - "/bin/sh"
+          - "-c"
+          - |
+            if ! kubectl get secret bigid-mongodb-ca ; then
+              kubectl create secret generic bigid-mongodb-ca \
+              --from-file=mongodb-ca-cert=/tls-creds/mongodb-ca-cert \
+              --from-file=mongodb-ca-key=/tls-creds/mongodb-ca-key \
+              --from-file=client-pem=tls-creds/client-pem
+              kubectl label secret bigid-mongodb-ca app.kubernetes.io/managed-by={{ .Release.Service }}
+              kubectl annotate secret bigid-mongodb-ca meta.helm.sh/release-name={{ .Release.Name }} meta.helm.sh/release-namespace={{ .Release.Namespace }}
+            fi
+
+            if ! kubectl get secret mongo-ssl-truststore-secrets ; then
+
+              openssl pkcs12 -export -out client.pkcs12 -in tls-creds/client-pem -password pass:password1
+              keytool -importkeystore -srckeystore client.pkcs12 -srcstoretype PKCS12 -destkeystore client.p12 -deststoretype pkcs12 -storepass password1 -srcstorepass password1
+              keytool -import -trustcacerts -alias mongo -file tls-creds/mongodb-ca-cert -keystore truststore.p12 -noprompt -storepass password1
+
+              mv client.p12 client.jks
+              mv truststore.p12 truststore.jks
+
+              kubectl create secret generic mongo-ssl-truststore-secrets \
+                --from-file=truststore.jks=truststore.jks --from-file=client.jks=client.jks \
+                --dry-run=client -oyaml | kubectl apply -f -
+              kubectl label secret mongo-ssl-truststore-secrets app.kubernetes.io/managed-by={{ .Release.Service }}
+              kubectl annotate secret mongo-ssl-truststore-secrets meta.helm.sh/release-name={{ .Release.Name }} meta.helm.sh/release-namespace={{ .Release.Namespace }}
+            fi
+        volumeMounts:
+          - name: tls
+            mountPath: /tls-creds
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

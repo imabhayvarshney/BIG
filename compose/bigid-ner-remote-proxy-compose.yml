@@ -1,0 +1,8 @@
+version: '3.2'
+
+services:
+  bigid-ner:
+    environment:
+      - HTTP_PROXY=${NER_HTTP_PROXY:-}
+      - HTTPS_PROXY=${NER_HTTPS_PROXY:-}
+      - NO_PROXY=0.0.0.0

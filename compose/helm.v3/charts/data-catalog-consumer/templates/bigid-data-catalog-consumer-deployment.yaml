@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-data-catalog-consumer
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-data-catalog-consumer
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "data-catalog-consumer.labels" . | nindent 4 }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.dataCatalogConsumer.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-data-catalog-consumer
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.dataCatalogConsumer.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.dataCatalogConsumer.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.dataCatalogConsumer.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-data-catalog-consumer
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-data-catalog-consumer.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-data-catalog-consumer.service: bigid-data-catalog-consumer
+        tags.datadoghq.com/service: "bigid-data-catalog-consumer"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      serviceAccount: bigid-data-catalog-consumer
+      automountServiceAccountToken: false
+      initContainers:
+        - name: init-config-service
+          image: {{ template "initContainer.image" . }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          command: ['sh', '-c', "until wget -q --spider http://bigid-config-service:{{ .Values.global.bigid.configService.port }}/actuator/health; do echo waiting for bigid-config-service; sleep 3; done"]
+          resources:
+            {{- toYaml .Values.global.initContainers.resources | nindent 12 }}
+          {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+          securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+        {{- if .Values.global.bigid.tenantService.create }}
+        - name: init-tenant-service
+          image: {{ template "initContainer.image" . }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          command: [ 'sh', '-c', "until wget -q --spider http://bigid-tenant-service:{{ .Values.global.bigid.tenantService.port }}/api/v1/tenant-service/health; do echo waiting for bigid-tenant-service; sleep 3; done" ]
+          resources:
+            {{- toYaml .Values.global.initContainers.resources | nindent 12 }}
+        {{- end }}
+      containers:
+      - name: bigid-data-catalog-consumer
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.dataCatalogConsumer.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /api/v1/data-catalog/health
+            port: {{ .Values.global.bigid.dataCatalogConsumer.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /api/v1/data-catalog/health
+            port: {{ .Values.global.bigid.dataCatalogConsumer.port }}
+          initialDelaySeconds: 1200
+          periodSeconds: 20
+          timeoutSeconds: 90
+          failureThreshold: 8
+          successThreshold: 1
+        ports:
+          - containerPort: {{ .Values.global.bigid.dataCatalogConsumer.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-node-configuration
+        - configMapRef:
+            name: global-configuration
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        env:
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+          - name: DD_AGENT_HOST
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.hostIP
+          - name: DD_ENV
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.labels['tags.datadoghq.com/bigid-data-catalog-consumer.env']
+          - name: DD_SERVICE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.labels['tags.datadoghq.com/bigid-data-catalog-consumer.service']
+        {{- end }}
+          - name: CATALOG_TYPE
+            value: "consumer"
+          - name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "bigid.secretKey" . }}
+                key: secretKey
+          - name: SECRET_SALT
+            valueFrom:
+              secretKeyRef:
+                name: secret-key
+                key: secretSalt
+          - name: BIGID_MQ_USER
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: rabbitmq-user
+          - name: BIGID_MQ_PWD
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: rabbitmq-pass
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: redis-pass
+          - name: PREFETCH_COUNT
+            value: {{ .Values.global.bigid.dataCatalogConsumer.prefetchCount | quote }}
+          - name: MULTI_TENANT_MODE_ENABLED
+            value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+          - name: IS_FIPS_MODE
+            value: {{ .Values.global.fips.enabled | quote }}
+          - name: NODE_OPTIONS
+            value: {{ printf "$(NODE_APM_OPTS) %s" (include "nodeJs.maxOldSpaceSize" .Values.global.bigid.dataCatalogConsumer) | quote }}
+          - name: SCALABLE_HEALTH_CHECK_ENABLED
+            value: "{{ .Values.global.bigid.scalableHealthCheck.enabled }}"
+          - name: TERMINATION_GRACE_PERIOD_SECONDS
+            value: {{ .Values.global.bigid.dataCatalogConsumer.appTerminationGracePeriodSeconds | quote }}
+          - name: DISABLE_SERVICES_LOGS
+            value: {{ .Values.global.bigid.shouldDisableLogs | quote }}
+          - name: LOG_LEVEL
+            value: {{ .Values.global.bigid.dataCatalogConsumer.logLevel | quote }}
+          - name: FF_CATALOG_COUNTERS_GRACE_COMPLETE_ENABLED
+            value: {{ .Values.global.bigid.dataCatalogConsumer.graceComplete.enabled | quote }}
+          - name: CATALOG_COUNTERS_GRACE_COMPLETE_COUNT_THRESHOLD
+            value: {{ .Values.global.bigid.dataCatalogConsumer.graceComplete.countThreshold | quote }}
+          - name: CATALOG_COUNTERS_GRACE_COMPLETE_PCT_THRESHOLD
+            value: {{ .Values.global.bigid.dataCatalogConsumer.graceComplete.pctThreshold | quote }}
+          - name: MULTI_TENANT_CONFIG_ENABLED
+            value: {{ .Values.global.bigid.configService.multiTenantConfigEnabled | quote }}
+          - name: SHOULD_GENERATE_AND_STORE_MONGO_CREDS_FF
+            value: {{ .Values.global.bigid.multiTenantMode.generateAndUseMongoCreds | quote }}
+          - name: DL_STREAM_NAME
+            value: "{{ .Values.global.bigid.dataLakeClient.dlStreamName }}"
+          - name: USE_SAAS
+            value: "{{ .Values.global.bigid.useSaas.enabled }}"
+          - name: SAAS_ENV
+            value: "{{ .Values.global.bigid.saasEnv }}"
+          - name: COMPANY_NAME
+            value: "{{ .Values.global.bigid.companyName }}"
+          {{- if .Values.global.extraEnvVars }}
+          {{- .Values.global.extraEnvVars | toYaml | nindent 10 }}
+          {{- end }}
+          {{- if .Values.global.bigid.dataCatalogConsumer.extraEnvVars }}
+          {{- .Values.global.bigid.dataCatalogConsumer.extraEnvVars | toYaml | nindent 10 }}
+          {{- end }}
+        resources:
+          {{- toYaml .Values.global.bigid.dataCatalogConsumer.resources | nindent 10 }}
+        volumeMounts:
+        - name: bigid-mongodb-ca
+          mountPath: /etc/ssl/bigid
+          readOnly: true
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: bigid-mongodb-ca
+        secret:
+          secretName: bigid-mongodb-ca
+          defaultMode: 420
+      {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: {{ .Values.global.bigid.dataCatalogConsumer.terminationGracePeriodSeconds }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

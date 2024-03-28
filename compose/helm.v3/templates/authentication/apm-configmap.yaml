@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apm-configuration
+  namespace: {{ .Release.Namespace | quote }}
+data:
+{{- if .Values.global.apm.enabled }}
+  {{- if eq .Values.global.apm.type "newrelic" }}
+  NEW_RELIC_LICENSE_KEY_VALUE: {{ .Values.global.apm.key | quote }}
+  TELEMETRY_ENABLED: {{ .Values.global.apm.enabled | quote }}
+  MONITORING_CUSTOMER_NAME: {{ .Values.global.apm.customerName | quote }}
+  NEW_RELIC_APM_ON: "true"
+  {{- else if eq .Values.global.apm.type "datadog" }}
+  NODE_APM_OPTS: "--require dd-trace/init"
+  JAVA_APM_OPTS: "-javaagent:/usr/src/app/dd-java-agent.jar"
+  SCANNER_JAVA_APM_OPTS: "-javaagent:/dd-java-agent.jar"
+  DD_TRACE_STARTUP_LOGS: "false"
+  DD_PROFILING_ENABLED: "true"
+  DD_PROFILING_ALLOCATION_ENABLED: "true"
+  DD_TRACE_STARTUP_LOGS: "false"
+  {{- end -}}
+{{- else }}
+  DD_PROFILING_ENABLED: "false"
+  NEW_RELIC_APM_ON: "false"
+  NODE_APM_OPTS: ""
+  JAVA_APM_OPTS: ""
+  SCANNER_JAVA_APM_OPTS: ""
+{{- end -}}

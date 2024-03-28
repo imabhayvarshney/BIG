@@ -1,0 +1,142 @@
+# Default values for classifier-helper.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## Global defaults values
+global:
+  # Default node selector for bigid services (except of rmq/mongo/redis)
+  nodeSelector: {}
+  ## @param affinity Affinity for pod assignment. Evaluated as a template
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+  ## @param master.tolerations Tolerations for master-elegible pods assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+  ## Default podAnnotations for bigid pods (except of rmq/mongo/redis)
+  podAnnotations: {}
+  # Default additionalLabels for bigid pods (except of rmq/mongo/redis)
+  additionalLabels: {}
+  # Default podLabels for bigid pods (except of rmq/mongo/redis)
+  podLabels: {}
+
+# Enable the service
+enabled: false
+
+replicaCount: 1
+
+image:
+  registry: 656782941097.dkr.ecr.us-east-1.amazonaws.com
+  repository: bigid/bigid-classifier-helper
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "3.0.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations:
+  ad.datadoghq.com/bigid-classifier-helper.logs: '[{"source": "python", "service": "classifier-helper"}]'
+
+## Update strategy - only really applicable for deployments with RWO PVs attached
+## If replicas = 1, an update can get "stuck", as the previous pod remains attached to the
+## PV, and the "incoming" pod can never start. Changing the strategy to "Recreate" will
+## terminate the single previous pod, so that the new, incoming pod can attach to the PV
+## @param updateStrategy.type deployment update strategy
+##
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+containerSecurityContext:
+  enabled: false
+
+podSecurityContext:
+  enabled: false
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  #   - NET_RAW
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+## Configure extra options for liveness probe
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+## @param livenessProbe.enabled Turn on and off liveness probe
+## @param livenessProbe.path Path of the HTTP service for checking the healthy state
+## @param livenessProbe.initialDelaySeconds Delay before liveness probe is initiated
+## @param livenessProbe.periodSeconds How often to perform the probe
+## @param livenessProbe.timeoutSeconds When the probe times out
+## @param livenessProbe.failureThreshold Minimum consecutive failures for the probe
+## @param livenessProbe.successThreshold Minimum consecutive successes for the probe
+##
+livenessProbe:
+  enabled: true
+  path: /manifest
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+## Configure extra options for readiness probe
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+## @param readinessProbe.enabled Turn on and off readiness probe
+## @param readinessProbe.path Path of the HTTP service for checking the ready state
+## @param readinessProbe.initialDelaySeconds Delay before readiness probe is initiated
+## @param readinessProbe.periodSeconds How often to perform the probe
+## @param readinessProbe.timeoutSeconds When the probe times out
+## @param readinessProbe.failureThreshold Minimum consecutive failures for the probe
+## @param readinessProbe.successThreshold Minimum consecutive successes for the probe
+##
+readinessProbe:
+  enabled: true
+  path: /manifest
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  limits:
+    memory: 2Gi
+    cpu: 1000m
+  requests:
+    memory: 1Gi
+    cpu: 500m
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+tolerations: []
+
+affinity: {}

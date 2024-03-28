@@ -1,0 +1,25 @@
+apiVersion: v2
+appVersion: "1.0"
+description: A Helm chart for Kubernetes
+name: autoscaling
+version: 1.0.0
+maintainers:
+- name: BigID DevOps
+  email: devops@bigid.com
+
+dependencies:
+- name: metrics-server
+  version: 3.11.0
+  repository: https://kubernetes-sigs.github.io/metrics-server/
+  condition: metrics-server.enabled
+  alias: metrics-server
+- name: prometheus
+  version: 25.0.0
+  repository: file://charts/prometheus
+  condition: prometheus.enabled
+  alias: prometheus
+- name: prometheus-adapter
+  version: 4.5.0
+  repository: https://prometheus-community.github.io/helm-charts/
+  condition: prometheus-adapter.enabled
+  alias: prometheus-adapter

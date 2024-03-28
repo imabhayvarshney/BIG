@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: bigid-cache
+  name: bigid-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bigid-cache
+  template:
+    metadata:
+      labels:
+        app: bigid-cache
+    spec:
+      containers:
+      - env:
+        {{- if .Values.auth.enabled }}
+        - name: REDIS_PASSWORD
+          value: {{ default "" .Values.auth.password }}
+        {{- end }}
+        image: "{{ .Values.global.image.repository }}/redis:{{ .Values.image.tag }}"
+        command: ['run-redis']
+        name: bigid-cache
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}
+        ports:
+        - containerPort: {{ .Values.port }}
+      volumes:
+        - name: health
+          configMap:
+            name: bigid-cache-config
+            defaultMode: 0755
+      imagePullSecrets:
+      - name: registrypullsecret
+      restartPolicy: Always

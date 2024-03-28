@@ -1,0 +1,9 @@
+version: '3.2'
+
+services:
+  vsam-api:
+    image: bigid/ol-vsam-api${OL_ENV}
+    ports:
+      - "8181:8080"
+    container_name: ol-vsam-api
+    restart: always

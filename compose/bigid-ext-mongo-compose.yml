@@ -1,0 +1,574 @@
+version: "3.2"
+
+volumes:
+  bigid-mq-data:
+    external: true
+  bigid-scanner-data:
+    external: true
+  bigid-web-data:
+    external: false
+
+services:
+  bigid-ui:
+    image: bigid/bigid-ui${BIGID_ENV}
+    ports:
+      - "443:443"
+    links:
+      - bigid-web
+    environment:
+      - DYNAMIC_MODIFY_PARSING_THREADS_FF=${DYNAMIC_MODIFY_PARSING_THREADS_FF:-true}
+      - TZ
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - USE_DISPLAY_NAME_FOR_POLICY_FF=${USE_DISPLAY_NAME_FOR_POLICY_FF:-false}
+      - DISABLE_LEGACY_ACL_FF=${DISABLE_LEGACY_ACL_FF:-false}
+    container_name: bigid-ui
+    volumes:
+      - ./bigid-ui/nginx.conf:/etc/nginx/conf.d/default.conf
+    restart: always
+
+  bigid-web:
+    image: bigid/bigid-web${BIGID_ENV}
+    expose:
+      - "3000"
+    links:
+      - bigid-orch
+      - bigid-mq
+      - bigid-cache
+    container_name: bigid-web
+    volumes:
+      - bigid-web-data:/usr/src/app/log
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - DEFAULT_BIGID_USER
+      - DEFAULT_BIGID_PW
+      - BIGID_UI_HOST_EXT
+      - BIGID_UI_PORT_EXT
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - SECRET_KEY
+      - AUTH_SECRET_KEY
+      - TOKEN_EXPIRATION_IN_MINUTES
+      - UI_IDLE_TIMEOUT_IN_MINUTES
+      - RESIDENCY_STATES_FIRST
+      - MONGO_EXTERNAL_FULL_URL
+      - TZ
+      - BIG_ID_REPORT_LANGUAGE
+      - BIGID_SAML_PRIVATE_CERT_PATH
+      - HIDE_ATTRIBUTE_PURPOSE_OF_USE
+      - BIGID_PRODUCT_TYPE
+      - ENTITY_LEVEL_TAGGING_SUPPORTED
+      - USE_EXTENDED_PERMISSIONS
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - MICROSOFT_GRAPH_API_PAGE_SIZE
+      - METADATA_CLASSIFIER_ENABLED
+      - SCAN_API_ENABLED
+      - AUDIT_FILE_MAX_SIZE
+      - PRINT_AUDIT_TO_STDOUT
+      - DIM_ENABLED
+      - USE_SAAS=${USE_SAAS:-false}
+      - OKTA_DOMAIN
+      - OKTA_API_TOKEN
+      - OKTA_APPLICATION
+      - OKTA_ROLE_GROUP_MAP
+      - OKTA_MAX_USERS
+      - BIGID_SCANNER_USER
+      - DISABLE_AUTO_UPGRADE_OF_CLASSIFIERS
+      - ENFORCE_STRONG_PASSWORD_SECURITY
+      - PAYLOAD_ENCRYPTION_KEY
+      - AMOUNT_OF_LOGS_FILE
+      - AUTH0_TOKEN_CLAIMS_NAMESPACE
+      - AUTH0_APP_NAME_ATTR_IN_TOKEN_CLAIMS
+      - RISK_ASSESSMENT_ENABLED=${RISK_ASSESSMENT_ENABLED:-false}
+      - CLASSIFIER_TESTER_ENABLED= ${CLASSIFIER_TESTER_ENABLED:-true}
+      - CONNECTIVITY_EXPERIENCE_ENABLED=${CONNECTIVITY_EXPERIENCE_ENABLED:-true}
+      - DS_ONBOARDING_LAYOUT_ENABLED=${DS_ONBOARDING_LAYOUT_ENABLED:-false}
+      - NEW_CONNECTION_TAB_ENABLED=${NEW_CONNECTION_TAB_ENABLED:-false}
+      - DS_COLLABORATION_ENABLED=${DS_COLLABORATION_ENABLED:-false}
+      - SUGGESTED_ACTIONS_ENABLED=${SUGGESTED_ACTIONS_ENABLED:-false}
+      - USE_DISPLAY_NAME_FOR_POLICY_FF=${USE_DISPLAY_NAME_FOR_POLICY_FF:-false}
+      - LOG_LEVEL
+      - ENABLE_UNIFIED_VAULTS=${ENABLE_UNIFIED_VAULTS:-false}
+      - DISABLE_LEGACY_ACL_FF=${DISABLE_LEGACY_ACL_FF:-false}
+      - PIPE_SCAN_PARTS_TO_ORCH2=${PIPE_SCAN_PARTS_TO_ORCH2:-false}
+      - DYNAMIC_MODIFY_SCAN_WINDOW=${DYNAMIC_MODIFY_SCAN_WINDOW:-true}
+      - SHOW_NEW_SCAN_INSIGHT= ${SHOW_NEW_SCAN_INSIGHT:-true}
+      - USE_SCAN_PAGE_STATE= ${USE_SCAN_PAGE_STATE:-true}
+      - ENABLE_SCAN_TEMPLATE= ${ENABLE_SCAN_TEMPLATE:-true}
+      - SHOW_GUIDED_TOUR_SCAN_TEMPLATES= ${SHOW_GUIDED_TOUR_SCAN_TEMPLATES:-true}
+      - SHOW_GUIDED_TOUR_CLASSIFICATION_STEP= ${SHOW_GUIDED_TOUR_CLASSIFICATION_STEP:-true}
+      - SHOW_GUIDED_TOUR_SAVED_SCANS= ${SHOW_GUIDED_TOUR_SAVED_SCANS:-true}
+      - SHOW_DIALOG_GUIDE_CONVERT_SCAN_PROFILE= ${SHOW_DIALOG_GUIDE_CONVERT_SCAN_PROFILE:-true}
+      - DSAR_USE_CATALOG_COLUMNS_ENABLED_FF=${DSAR_USE_CATALOG_COLUMNS_ENABLED_FF:-true}
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://bigid-web:3000/health/readiness"]
+      interval: 20s
+      timeout: 10s
+      retries: 8
+
+  bigid-orch:
+    image: bigid/bigid-orch${BIGID_ENV}
+    expose:
+      - "3001"
+    links:
+      - bigid-scanner
+      - bigid-mq
+      - bigid-cache
+    container_name: bigid-orch
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - SECRET_KEY
+      - AUTH_SECRET_KEY
+      - APPLICATION_CREDENTIALS_KEY
+      - MONGO_EXTERNAL_FULL_URL
+      - MONGO_PUBLIC_FULL_URL
+      - ORCHESTRATOR_URL_EXT # If the Scanner is on a different Docker host, preferably Internal IP.
+      - ORCHESTRATOR_URL_PUBLIC # Public IP: For Hadoop and EMR, in case Hadoop / EMR cluster are outside the VPC. If not set, hadoop callback URL will use ORCHESTRATOR_URL_EXT.
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC # Same as up.
+      - SAVE_SCANNED_IDENTITIES_AS_PII_FINDINGS
+      - SCANNED_VALUES_IGNORE_LIST
+      - TRUST_SELF_SIGNED_CERTS
+      - IS_CALC_PSEUDO_PII
+      - JIT_FILTER_LOW_CONFIDENCE_FACTOR
+      - SAR_ONLY_STRICT_MATCHES
+      - LINEAGE_ATTRIBUTES_BY_CONFIDENCE
+      - METADATA_ACL_SCAN_ENABLED
+      - DATA_SOURCE_ACL_SCAN_ENABLED
+      - TZ
+      - CORRELATION_RECOVERY_SCHEDULER_FLAG
+      - NER_CLASSIFIER_ENABLED_FEATURE_FLAG
+      - IDENTITY_RESOLUTION_ENABLED
+      - RUN_RETENTION_POLICY_PROCESS
+      - SCAN_PARTS_ENABLED
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - METADATA_CLASSIFIER_ENABLED
+      - SCAN_API_ENABLED
+      - BIGID_SCANNER_USER
+      - IGNITE_CLUSTER_URL
+      - DISABLE_AUTO_UPGRADE_OF_CLASSIFIERS
+      - SHOULD_AUTO_REGISTER_APPLICATIONS
+      - APPS_TO_AUTO_REGISTER
+      - PAYLOAD_ENCRYPTION_KEY
+      - AMOUNT_OF_LOGS_FILE
+      - STATE_MANAGEMENT_API_ENABLED
+      - CLASSIFIER_TESTER_ENABLED=${CLASSIFIER_TESTER_ENABLED:-true}
+      - AUTO_RETRY_SCAN_PARTS_FF=${AUTO_RETRY_SCAN_PARTS_FF:-true}
+      - SCAN_JOBS_IN_MEMORY_ENABLED=${SCAN_JOBS_IN_MEMORY_ENABLED:-false}
+      - BIGID_SCAN_SCHEDULER_ENABLED=${BIGID_SCAN_SCHEDULER_ENABLED:-false}
+      - CONNECTIVITY_EXPERIENCE_ENABLED=${CONNECTIVITY_EXPERIENCE_ENABLED:-true}
+      - DS_ONBOARDING_LAYOUT_ENABLED=${DS_ONBOARDING_LAYOUT_ENABLED:-false}
+      - DS_COLLABORATION_ENABLED=${DS_COLLABORATION_ENABLED:-false}
+      - SUGGESTED_ACTIONS_ENABLED=${SUGGESTED_ACTIONS_ENABLED:-false}
+      - USE_DISPLAY_NAME_FOR_POLICY_FF=${USE_DISPLAY_NAME_FOR_POLICY_FF:-false}
+      - ENVIRONMENT_FF=${ENVIRONMENT_FF:-prod}
+      - DYNAMIC_MODIFY_PARSING_THREADS_FF=${DYNAMIC_MODIFY_PARSING_THREADS_FF:-true}
+      - USE_SCAN_PAGE_STATE= ${USE_SCAN_PAGE_STATE:-true}
+      - LOG_LEVEL
+      - DISABLE_LEGACY_ACL_FF=${DISABLE_LEGACY_ACL_FF:-false}
+      - DYNAMIC_MODIFY_SCAN_WINDOW=${DYNAMIC_MODIFY_SCAN_WINDOW:-true}
+      - ENABLE_SSE_ON_ML=${ENABLE_SSE_ON_ML:-true}
+      - CLASSIFIER_SUPERSCAN_PREFILTERING_ENABLED=${CLASSIFIER_SUPERSCAN_PREFILTERING_ENABLED:-false}
+      - MIGRATE_TO_SCAN_PAGE_STATE=${MIGRATE_TO_SCAN_PAGE_STATE:-true}
+      - ENABLE_SCAN_TEMPLATE= ${ENABLE_SCAN_TEMPLATE:-true}
+      - DISABLE_WIDE_CLASSIFIERS= ${DISABLE_WIDE_CLASSIFIERS:-false}
+      - METADATA_UPDATE_BY_BULK_ENABLED= ${METADATA_UPDATE_BY_BULK_ENABLED:-false}
+      - METADATA_UPDATE_BY_BULK_SIZE= ${METADATA_UPDATE_BY_BULK_SIZE:-40}
+      - USE_BACKPRESSURE_BULK_UPDATES= ${USE_BACKPRESSURE_BULK_UPDATES:-false}
+      - ENABLE_RELEASE_STUCK_PARTS_IN_CACHE= ${ENABLE_RELEASE_STUCK_PARTS_IN_CACHE:-true}
+      - REDIS_QUEUED_SCAN_PARTS_MAX_IDLE_TIME_MINUTES= ${REDIS_QUEUED_SCAN_PARTS_MAX_IDLE_TIME_MINUTES:-360}
+      - SCAN_WINDOW_SCHEDULER_ENABLED= ${SCAN_WINDOW_SCHEDULER_ENABLED:-false}
+
+
+    hostname: bigid-orch
+    restart: always
+
+  bigid-orch2:
+    image: bigid/bigid-orch${BIGID_ENV}
+    expose:
+      - "3003"
+    links:
+      - bigid-scanner
+      - bigid-mq
+      - bigid-cache
+    container_name: bigid-orch2
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - SECRET_KEY
+      - MONGO_EXTERNAL_FULL_URL
+      - ORCHESTRATOR_URL_EXT # If the Scanner is on a different Docker host, preferably Internal IP.
+      - ORCHESTRATOR_URL_PUBLIC # Public IP: For Hadoop and EMR, in case Hadoop / EMR cluster are outside the VPC. If not set, hadoop callback URL will use ORCHESTRATOR_URL_EXT.
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC # Same as up.
+      - SAVE_SCANNED_IDENTITIES_AS_PII_FINDINGS
+      - SCANNED_VALUES_IGNORE_LIST
+      - TRUST_SELF_SIGNED_CERTS
+      - NER_CLASSIFIER_ENABLED_FEATURE_FLAG
+      - PORT=3003
+      - IS_ORCH2=true
+      - TZ
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - METADATA_CLASSIFIER_ENABLED
+      - DISABLE_AUTO_UPGRADE_OF_CLASSIFIERS
+      - PAYLOAD_ENCRYPTION_KEY
+      - AMOUNT_OF_LOGS_FILE
+      - STATE_MANAGEMENT_API_ENABLED
+      - RISK_ASSESSMENT_ENABLED=${RISK_ASSESSMENT_ENABLED:-true}
+      - CLASSIFIER_TESTER_ENABLED= ${CLASSIFIER_TESTER_ENABLED:-true}
+      - BIGID_SCHEDULER_ENABLED=${BIGID_SCHEDULER_ENABLED:-false}
+      - BIGID_SCHEDULER_JOB_TRIGGER_LOG_ENABLED=${BIGID_SCHEDULER_JOB_TRIGGER_LOG_ENABLED:-true}
+      - AUTO_RETRY_SCAN_PARTS_FF=${AUTO_RETRY_SCAN_PARTS_FF:-true}
+      - SCAN_JOBS_IN_MEMORY_ENABLED=${SCAN_JOBS_IN_MEMORY_ENABLED:-false}
+      - CONNECTIVITY_EXPERIENCE_ENABLED=${CONNECTIVITY_EXPERIENCE_ENABLED:-true}
+      - DS_ONBOARDING_LAYOUT_ENABLED=${DS_ONBOARDING_LAYOUT_ENABLED:-false}
+      - DS_COLLABORATION_ENABLED=${DS_COLLABORATION_ENABLED:-false}
+      - SUGGESTED_ACTIONS_ENABLED=${SUGGESTED_ACTIONS_ENABLED:-false}
+      - USE_DISPLAY_NAME_FOR_POLICY_FF=${USE_DISPLAY_NAME_FOR_POLICY_FF:-false}
+      - ENVIRONMENT_FF=${ENVIRONMENT_FF:-prod}
+      - DYNAMIC_MODIFY_PARSING_THREADS_FF=${DYNAMIC_MODIFY_PARSING_THREADS_FF:-true}
+      - USE_SCAN_PAGE_STATE= ${USE_SCAN_PAGE_STATE:-true}
+      - LOG_LEVEL
+      - REPORT_BIGID_SCHEDULER_JOBS_COUNT_METRICS_CRON_EXP
+      - REPORT_BIGID_SCHEDULER_JOBS_TRIGGERED_COUNT_METRICS_CRON_EXP
+      - BIGID_SCHEDULER_JOB_MODIFY_LOCK_TTL_MS
+      - DISABLE_LEGACY_ACL_FF=${DISABLE_LEGACY_ACL_FF:-false}
+      - DYNAMIC_MODIFY_SCAN_WINDOW=${DYNAMIC_MODIFY_SCAN_WINDOW:-true}
+      - ENABLE_SSE_ON_ML=${ENABLE_SSE_ON_ML:-true}
+      - CLASSIFIER_SUPERSCAN_PREFILTERING_ENABLED=${CLASSIFIER_SUPERSCAN_PREFILTERING_ENABLED:-false}
+      - ENABLE_SCAN_TEMPLATE= ${ENABLE_SCAN_TEMPLATE:-true}
+      - DISABLE_WIDE_CLASSIFIERS= ${DISABLE_WIDE_CLASSIFIERS:-false}
+      - METADATA_UPDATE_BY_BULK_ENABLED= ${METADATA_UPDATE_BY_BULK_ENABLED:-false}
+      - METADATA_UPDATE_BY_BULK_SIZE= ${METADATA_UPDATE_BY_BULK_SIZE:-40}
+      - USE_BACKPRESSURE_BULK_UPDATES= ${USE_BACKPRESSURE_BULK_UPDATES:-false}
+      - ENABLE_RELEASE_STUCK_PARTS_IN_CACHE= ${ENABLE_RELEASE_STUCK_PARTS_IN_CACHE:-true}
+      - REDIS_QUEUED_SCAN_PARTS_MAX_IDLE_TIME_MINUTES= ${REDIS_QUEUED_SCAN_PARTS_MAX_IDLE_TIME_MINUTES:-360}
+      - SCAN_WINDOW_SCHEDULER_ENABLED= ${SCAN_WINDOW_SCHEDULER_ENABLED:-false}
+
+
+    hostname: bigid-orch2
+    restart: always
+
+  bigid-scanner:
+    image: bigid/bigid-scanner${BIGID_ENV}
+    expose:
+      - "9999"
+    container_name: bigid-scanner
+    user: bigid
+    hostname: bigid-scanner
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - SCANNER_JAVA_OPTS
+      - IS_SCANNER_BLOCKED_BY_CONFIG_SERVICE
+      - THREAD_POOL_SIZE # Deprecated
+      - SCANNER_THREADS
+      - SCANNER_MAX_THREADS
+      - EXPANSIBLE_THREAD_POOL
+      - JIT_SCAN_THREADS
+      - DELETION_SCAN_THREADS
+      - ORCH_ASYNCH
+      - BIGID_USER
+      - IGNORE_MEDIA_TYPE # list of Tika MediaType that overwrite as MediaType.TEXT_PLAIN
+      - BIGID_PASSWORD
+      - SCANNER_HOST_NAME
+      - SCANNER_GROUP_NAME
+      - DISCOVERY_ENGINE_ALGORITHM
+      - DATA_PREVIEW_DISABLED
+      - BIGID_UI_HOST_EXT
+      - BIGID_UI_PORT_EXT
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - HADOOP_DIST
+      - TZ
+      - ENABLE_GENERIC_REST_API_CONNECTOR=${ENABLE_GENERIC_REST_API_CONNECTOR:-false}
+      - SET_SAP_SECUDIR
+      - USE_OJDBC7
+      - USE_DB2_JCC3
+      - USE_SAS
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - DISABLE_NFS_AUTOMOUNT
+      - NFS_V4_PROTOCOL
+      - PAYLOAD_ENCRYPTION_KEY
+      - ORCH_CLIENT_MAX_CONNECTION_PER_ROUTE=${ORCH_CLIENT_MAX_CONNECTION_PER_ROUTE:-24}
+      - ORCH_CLIENT_MAX_CONNECTION_TOTAL=${ORCH_CLIENT_MAX_CONNECTION_TOTAL:-34}
+      - INTERNAL_METADATA_PROCESSING_THREADS=${INTERNAL_METADATA_PROCESSING_THREADS:-21}
+      - CLASSIFIER_SUPERSCAN_CACHE_EXPIRATION_PERIOD=${CLASSIFIER_SUPERSCAN_CACHE_EXPIRATION_PERIOD}
+      - MQ_DSPM_PREFETCH_COUNT
+    privileged: ${ENABLE_PRIVILEGED_SCANNER:-true}
+    volumes:
+      - bigid-scanner-data:/etc/scanner
+    restart: always
+
+  bigid-mq:
+    image: rabbitmq:3.12.12-management
+    user: rabbitmq
+    ports:
+      - "15671:15671"
+      - "5671:5671"
+    container_name: bigid-mq
+    hostname: rabbitmq
+    volumes:
+      - bigid-mq-data:/etc/rabbitmq
+      - bigid-mq-data:/var/lib/rabbitmq/mnesia
+    restart: always
+    environment:
+      - TZ
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+
+  bigid-cache:
+    image: bitnami/redis:7.2.4
+    expose:
+      - "6379"
+    container_name: bigid-cache
+    environment:
+      - REDIS_PASSWORD=password
+      - REDIS_AOF_ENABLED=no
+    command: /opt/bitnami/scripts/redis/run.sh --save ""
+    restart: always
+    hostname: bigid-cache
+
+  bigid-corr-new:
+    image: bigid/bigid-corr-new${BIGID_ENV}
+    expose:
+      - "7082"
+    container_name: bigid-corr-new
+    depends_on:
+      - bigid-web
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_MQ_HOST
+      - MONGO_EXTERNAL_FULL_URL
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_IGNITE_HOST_EXT
+      - NEW_CORR_JVM_OPTS
+      - BIGID_CORR_CACHE_SIZE=${BIGID_CORR_CACHE_SIZE:-4}
+      - NEW_CORR_JVM_SSL_OPTS
+      - SPRING_PROFILES_ACTIVE
+      - GENERATE_IDENTITIES_ON_START_UP
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - MULTI_TENANT_MODE_ENABLED
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - APPEND_TO_JSON_LOGS
+      - NUMBERS_LENGTH_THRESHOLD
+      - TZ
+    restart: always
+
+  bigid-reports:
+    image: bigid/bigid-reports${BIGID_ENV}
+    expose:
+      - "3005"
+    container_name: bigid-reports
+    depends_on:
+      - bigid-config-service
+      - bigid-mq
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - LOG_LEVEL
+      - IS_PART_OF_BIGID=true
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+    hostname: bigid-reports
+    restart: always
+
+  bigid-data-catalog:
+    image: bigid/bigid-data-catalog${BIGID_ENV}
+    expose:
+      - "3555"
+    links:
+      - bigid-mq
+      - bigid-orch
+      - bigid-cache
+    container_name: bigid-data-catalog
+    depends_on:
+      - bigid-orch
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - SECRET_KEY
+      - MONGO_EXTERNAL_FULL_URL
+      - MONGO_PUBLIC_FULL_URL
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - LOG_LEVEL
+      - BIGID_CONFIG_URL
+      - STATE_MANAGEMENT_API_ENABLED
+    hostname: bigid-data-catalog
+    restart: always
+
+  bigid-config-service:
+    image: bigid/bigid-config-service${BIGID_ENV}
+    expose:
+      - "3004"
+    container_name: bigid-config-service
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - BIGID_ENV_VARS
+      - LOG_LEVEL
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - MONGO_EXTERNAL_FULL_URL
+      - BIGID_MONGO_HOST_EXT
+      - CONFIG_SERVICE_JVM_OPTS
+      - CONFIG_SERVICE_JVM_SSL_OPTS
+      - BOOLEAN_SERVICES_MAP=${BOOLEAN_SERVICES_MAP:-false}
+      - CONFIG_SERVICE_REDIS_CACHE=${CONFIG_SERVICE_REDIS_CACHE:-false}
+    hostname: bigid-config-service
+    cap_add:
+      - SYS_ADMIN
+    restart: always
+
+  bigid-action-center:
+    image: bigid/bigid-action-center${BIGID_ENV}
+    expose:
+      - "3556"
+    links:
+      - bigid-mq
+      - bigid-orch
+      - bigid-cache
+    container_name: bigid-action-center
+    extra_hosts:
+      - bigid-mongo:${BIGID_MONGO_HOST_EXT}
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - PORT=${ACTION_CENTER_PORT:-3556}
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - SECRET_KEY
+      - MONGO_EXTERNAL_FULL_URL
+      - ORCHESTRATOR_URL
+      - BIGID_UI_HOST_EXT
+      - BIGID_UI_PORT_EXT
+      - MONGO_PUBLIC_FULL_URL
+      - BIGID_MQ_HOST_EXT
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC # Same as up.
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - NEW_RELIC_APM_ON
+      - LOG_LEVEL
+      - BIGID_CONFIG_URL
+      - USE_DISPLAY_NAME_FOR_POLICY_FF=${USE_DISPLAY_NAME_FOR_POLICY_FF:-false}
+
+    hostname: bigid-action-center
+    restart: always

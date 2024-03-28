@@ -1,0 +1,22 @@
+version: '3.2'
+
+services:
+  bigid-catalog-processor:
+    image: bigid/bigid-catalog-processor${BIGID_ENV}
+    hostname: bigid-catalog-processor
+    container_name: bigid-catalog-processor
+    ports:
+      - "8099:8099"
+    environment:
+      - BIGID_ENV_VARS
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - MONGO_EXTERNAL_FULL_URL
+      - BIGID_MONGO_HOST_EXT
+      - LOG_LEVEL
+      - SPRING_PROFILES_ACTIVE
+      - BIGID_UI_PORT_EXT
+      - JDK_JAVA_OPTIONS=${JDK_JAVA_OPTIONS:--server -Xms1g -Xmx1g}
+    restart: always

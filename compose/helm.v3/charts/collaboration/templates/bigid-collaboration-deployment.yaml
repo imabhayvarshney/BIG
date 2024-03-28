@@ -1,0 +1,188 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-collaboration
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-collaboration
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.collaboration.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-collaboration
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.collaboration.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.collaboration.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with .Values.global.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-collaboration
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-collaboration.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-collaboration.service: bigid-collaboration
+        tags.datadoghq.com/service: "bigid-collaboration"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      serviceAccount: bigid-collaboration
+      automountServiceAccountToken: false
+      initContainers:
+      - name: init-config-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until wget -q --spider http://bigid-config-service:{{ .Values.global.bigid.configService.port }}/actuator/health; do echo waiting for bigid-config-service; sleep 3; done"]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      - name: init-mq
+        image: {{ template "initContainer.image" . }}
+        command: ['sh', '-c', 'until nc -zv $(BIGID_MQ_HOST_EXT) $(BIGID_MQ_PORT) -w1; do echo waiting for mq; sleep 3; done;']
+        envFrom:
+        - configMapRef:
+            name: global-configuration
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- if .Values.global.bigid.tenantService.create }}
+      - name: init-tenant-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: [ 'sh', '-c', "until wget -q --spider http://bigid-tenant-service:{{ .Values.global.bigid.tenantService.port }}/api/v1/tenant-service/health; do echo waiting for bigid-tenant-service; sleep 3; done" ]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      containers:
+      - name: bigid-collaboration
+        {{- if .Values.global.bigid.collaboration.image.tag }}
+        image: {{ .Values.global.image.repository }}/{{ .Values.global.bigid.collaboration.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.bigid.collaboration.image.tag }}
+        {{ else }}
+        image: {{ .Values.global.image.repository }}/{{ .Values.global.bigid.collaboration.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}
+        {{ end }}
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /api/v1/collaboration/health/readiness
+            port: {{ .Values.global.bigid.collaboration.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v1/collaboration/health
+            port: {{ .Values.global.bigid.collaboration.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.global.bigid.collaboration.resources | nindent 10 }}
+        ports:
+        - containerPort: {{ .Values.global.bigid.collaboration.port }}
+        envFrom:
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: mongodb-node-configuration
+        - configMapRef:
+            name: global-configuration
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-collaboration.env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-collaboration.service']
+        {{- end }}
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "bigid.secretKey" . }}
+              key: secretKey
+        - name: BIGID_MQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-user
+        - name: BIGID_MQ_PWD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-pass
+        - name: BIGID_MQ_PROTOCOL
+          value: "amqps://"
+        - name: USE_SAAS
+          value: "{{ .Values.global.bigid.useSaas.enabled }}"
+        - name: MULTI_TENANT_CONFIG_ENABLED
+          value: {{ .Values.global.bigid.configService.multiTenantConfigEnabled | quote }}
+        - name: MULTI_TENANT_MODE_ENABLED
+          value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+        volumeMounts:
+          - name: bigid-mongodb-ca
+            mountPath: /etc/ssl/bigid
+            readOnly: true
+      volumes:
+      - name: bigid-mongodb-ca
+        secret:
+          secretName: bigid-mongodb-ca
+          defaultMode: 420
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

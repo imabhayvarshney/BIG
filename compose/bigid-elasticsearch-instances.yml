@@ -1,0 +1,7 @@
+instances:
+  - name: bigid-elasticsearch
+    dns:
+      - bigid-elasticsearch
+      - localhost
+    ip:
+      - 127.0.0.1

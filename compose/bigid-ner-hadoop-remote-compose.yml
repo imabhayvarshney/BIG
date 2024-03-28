@@ -1,0 +1,6 @@
+version: '3.2'
+
+services:
+  bigid-ner-hadoop:
+    environment:
+      - IS_REMOTE_SCANNER=${IS_REMOTE_SCANNER:-true}

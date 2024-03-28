@@ -1,0 +1,62 @@
+version: '3.2'
+services:
+  bigid-reporting-etl:
+    image: bigid/bigid-reporting-etl${BIGID_ENV}
+    expose:
+      - "3557"
+    container_name: bigid-reporting-etl
+    environment:
+      - BIGID_VERSION=${BIGID_VERSION:-release}
+      - BIGID_DATE
+      - BIGID_GIT_HASH
+      - PORT=${REPORTING_ETL_PORT:-3557}
+      - BIGID_MONGO_USER
+      - BIGID_MONGO_PWD
+      - BIGID_MQ_USER
+      - BIGID_MQ_PWD
+      - SECRET_KEY
+      - BIGID_REDIS_HOST
+      - BIGID_REDIS_PORT
+      - REDIS_PASSWORD
+      - MONGO_EXTERNAL_FULL_URL
+      - ORCHESTRATOR_URL
+      - BIGID_UI_HOST_EXT
+      - BIGID_UI_PORT_EXT
+      - MONGO_PUBLIC_FULL_URL
+      - BIGID_MQ_HOST_EXT
+      - BIGID_MONGO_HOST_EXT
+      - BIGID_MONGO_HOST_PUBLIC # Same as up.
+      - NEW_RELIC_LICENSE_KEY_VALUE
+      - MONITORING_CUSTOMER_NAME
+      - TELEMETRY_ENABLED
+      - LOG_LEVEL
+      - BIGID_CONFIG_URL
+      - BIGID_MONGO_SSL
+      - BIGID_MONGO_SSL_DISABLE_HOSTNAME_VERIFICATION
+      - BIGID_MONGO_SSL_CA_PATH
+      - BIGID_MONGO_SSL_CLIENT_CERT_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PATH
+      - BIGID_MONGO_SSL_CLIENT_KEY_PASS
+      - ENABLE_REPORTING_ETL=${ENABLE_REPORTING_ETL:-true}
+      - USE_SAAS=${USE_SAAS:-false}
+      - DIS_DEPLOYMENT_MODE
+    volumes:
+      - type: bind
+        source: ./mongo/ssl
+        target: /etc/ssl/bigid
+        read_only: true
+    hostname: bigid-reporting-etl
+    restart: always
+
+
+  bigid-web:
+    environment:
+      - ENABLE_REPORTING_ETL=true
+
+  bigid-orch:
+    environment:
+      - ENABLE_REPORTING_ETL=true
+
+  bigid-orch2:
+    environment:
+      - ENABLE_REPORTING_ETL=true

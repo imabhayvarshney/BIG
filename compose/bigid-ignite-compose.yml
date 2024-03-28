@@ -1,0 +1,23 @@
+version: "3.2"
+
+services:
+  ignite-master:
+    image: apacheignite/ignite:2.8.1
+    container_name: ignite-master
+    environment:
+      - OPTION_LIBS=ignite-rest-http
+      - JVM_OPTS=-Xms5g -Xmx5g -server -XX:+AggressiveOpts
+      - CONFIG_URI=file:///ignite/ignite-configuration.xml
+      - IGNITE_QUIET=false
+    network_mode: host
+    ports:
+      - "11211:11211" # JDBC port number.
+      - "47100-47200:47100-47200" # communication SPI port number.
+      - "47500-47509:47500-47509" # discovery SPI port number.
+      - "48100-48200:48100-48200" # shared memory port
+      - "8080:8080" # REST port number.
+      - "10901:10900" #Thin clients port number.
+      - "10800:10800"
+    volumes:
+      - ./ignite/ignite-configuration.xml:/ignite/ignite-configuration.xml:ro
+    restart: always

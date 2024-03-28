@@ -1,0 +1,18 @@
+version: '3.2'
+
+services:
+  bigid-cache:
+    image: bitnami/redis:7.2.4
+    ports:
+      - "6379:6379"
+    container_name: bigid-cache
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      - REDIS_PASSWORD=password
+      - REDIS_AOF_ENABLED=no
+    command: /opt/bitnami/scripts/redis/run.sh --save ""
+    restart: always

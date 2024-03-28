@@ -1,0 +1,18 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: bigid-remediation-ui-bff
+  name: bigid-remediation-ui-bff
+spec:
+  ports:
+    - name: ui
+      port: 8443
+      targetPort: 8443
+    - name: bff
+      port:  9443
+      targetPort:  9443
+  selector:
+    app: bigid-remediation-ui-bff
+{{- end }}

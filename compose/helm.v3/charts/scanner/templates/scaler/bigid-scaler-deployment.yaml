@@ -1,0 +1,253 @@
+{{- if .Values.global.bigid.scaler.create -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scanner-scaler" | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-scanner-scaler
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.scaler.replicaCount }}
+  {{- if .Values.global.bigid.scaler.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.scaler.updateStrategy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: bigid-scanner-scaler
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/scaler/bigid-scaler-configmap.yaml") . | sha256sum }}
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.scaler.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-scanner-scaler
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccount: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-scanner-scaler" | quote }}
+      containers:
+      - name: bigid-scanner-scaler
+        {{- if .Values.global.bigid.scaler.image.tag }}
+        image: "{{ .Values.global.image.repository }}/{{ .Values.global.bigid.scaler.image.repository }}{{ template "bigid.scannerArmRepository" . }}:{{ .Values.global.bigid.scaler.image.tag }}"
+        {{- else }}
+        image: "{{ .Values.global.image.repository }}/{{ .Values.global.bigid.scaler.image.repository }}{{ template "bigid.scannerArmRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- end }}
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        envFrom:
+        {{- if not .Values.global.bigid.scanner.remote.enabled }}
+        - secretRef:
+            name: mongodb-base-configuration
+        - configMapRef:
+            name: global-configuration
+        {{- end }}
+        env:
+          - name: "K8S_NAMESPACE"
+            value: "{{ .Release.Namespace }}"
+          - name: "K8S_DEPLOYMENT"
+            value: "{{ .Values.global.bigid.scaler.scannerName }}"
+          {{- if .Values.global.bigid.scanner.remote.enabled }}
+          - name: SPRING_PROFILES_ACTIVE
+            value: k8s-remote
+          - name: LOCAL_CLOUD_SCANNER_NAMES
+            value: "{{ .Values.global.bigid.scanner.hostName }} ({{ .Values.global.bigid.scanner.groupName }})"
+          - name: BIGID_REFRESH_TOKEN
+            value: {{ .Values.global.bigid.scanner.refreshToken }}
+          - name: REDIS_CACHE_HOST_NAME
+            value: "localhost"
+          - name: BIGID_UI_HOST_EXT
+            value: "{{ .Values.global.ingress.bigidHost }}"
+          {{- else }}
+          - name: "SPRING_PROFILES_ACTIVE"
+            value: "k8s"
+          - name: BIGID_CACHE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: bigid-auth-secret
+                key: redis-pass
+          {{- end }}
+          {{- if .Values.global.bigid.scaler.scannerController.enabled }}
+          - name: "SCANNER_DEPLOYMENT_YAML_PATH"
+            value: "/scanner.yaml"
+          {{- end }}
+          - name: "DL_REGION_NAME"
+            value: "{{ .Values.global.bigid.scaler.dlRegionName }}"
+          - name: "DATADOG_ENABLED"
+            value: "{{ .Values.global.bigid.ddMetrics.dataDogEnabled }}"
+          - name: "KINESIS_ENABLED"
+            value: "{{ .Values.global.bigid.scaler.kinesisEnabled }}"
+          - name: "TELEMETRY_ENABLED"
+            value: "{{ .Values.global.bigid.scaler.telemetryEnabled }}"
+          - name: "DL_STREAM_NAME"
+            value: "{{ .Values.global.bigid.scaler.dlStreamName }}"
+          - name: "DD-API-KEY"
+            value: "{{ .Values.global.bigid.ddMetrics.ddApiKey }}"
+          - name: DD-URI
+            value: "{{ .Values.global.bigid.ddMetrics.ddURI }}"
+          - name: APPS_NODE_SELECTOR
+            value: "{{ .Values.global.bigid.scaler.appsManager.nodeSelector }}"
+          - name: MULTI_TENANT_MODE_ENABLED
+            value: "{{ .Values.global.bigid.multiTenantMode.enabled }}"
+          - name: MONGO_HOST_URL
+            value: "$(BIGID_MONGO_HOST_EXT)"
+          - name: "BIGID_CACHE_DB"
+            value: "5"
+          - name: "SCANNER_GROUP"
+            value: "{{ .Values.global.bigid.scanner.groupName }}"
+          - name: QUEUE_SCAN_PARTS_SIZE_SCALE_UP_THRESHOLD
+            value: "{{ .Values.global.bigid.scaler.queueScanPartsThreshold }}"
+          - name: "CPU_SCALE_UP_THRESHOLD"
+            value: "{{ .Values.global.bigid.scaler.cpuThreshold }}"
+          - name: "CPU_SCALE_DOWN_THRESHOLD"
+            value: "{{ .Values.global.bigid.scaler.cpuScaleDownThreshold }}"
+          - name: "QUEUE_SIZE_SCALE_UP_THRESHOLD"
+            value: "{{ .Values.global.bigid.scaler.queueThreshold }}"
+          - name: "SCANNER_MIN_PODS"
+            value: "{{ .Values.global.bigid.scaler.minPods }}"
+          - name: "SCANNER_MAX_PODS"
+            value: "{{ .Values.global.bigid.scaler.maxPods }}"
+          - name: "SCANNER_THREADS_ACTIVITY_HISTOGRAM_LENGTH_MINUTES"
+            value: "{{ .Values.global.bigid.scaler.threadsActivityHistogramLength }}"
+          - name: "SCAN_PARTS_SIZE_QUEUE_HISTOGRAM_LENGTH_MINUTES"
+            value: "{{ .Values.global.bigid.scaler.partsSizeQueueHistogramLength }}"
+          - name: QUEUE_HISTOGRAM_LENGTH_MINUTES
+            value: "{{ .Values.global.bigid.scaler.queueHistogramLength }}"
+          - name: SCALE_IN_CANDIDATE_LOCK_TTL_MINUTES
+            value: "{{ .Values.global.bigid.scaler.lockTTLMinutes }}"
+          - name: SCALING_IN_EVENT_COOL_DOWN_MINUTES
+            value: "{{ .Values.global.bigid.scaler.scalingCoolDownMinutes }}"
+          - name: SCALE_IN_CANDIDATE_GRACE_MINUTES
+            value: "{{ .Values.global.bigid.scaler.candidateGraceMinutes }}"
+          - name: K8S_DEPLOYMENT_LABEL
+            value: "app={{ .Values.global.bigid.scaler.scannerName }}"
+        resources:
+          {{- toYaml .Values.global.bigid.scaler.resources | nindent 10 }}
+        volumeMounts:
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.global.bigid.scaler.scannerController.enabled }}
+        - name: scanner-yaml
+          mountPath: /scanner.yaml
+          subPath: scanner.yaml
+        {{- end }}
+      {{- if .Values.global.bigid.scanner.remote.enabled }}
+      - name: bigid-cache
+        image: {{ .Values.global.bigid.redis.image }}
+        imagePullPolicy: Always
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+          successThreshold: 1
+          exec:
+            command:
+              - sh
+              - -c
+              - /health/ping_readiness_local.sh 1
+        resources:
+          requests:
+            memory: {{ .Values.global.bigid.redis.resources.requests.memory }}
+            cpu: {{ .Values.global.bigid.redis.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.global.bigid.redis.resources.limits.memory }}
+            cpu: {{ .Values.global.bigid.redis.resources.limits.cpu }}
+        livenessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+          successThreshold: 1
+          exec:
+            command:
+              - sh
+              - -c
+              - /health/ping_liveness_local.sh 5
+        volumeMounts:
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: health
+          mountPath: /health
+        ports:
+          - containerPort: {{ .Values.global.bigid.redis.port }}
+        env:
+          - name: REDIS_PASSWORD
+            value: {{ .Values.global.bigid.redis.password }}
+          - name: REDIS_AOF_ENABLED
+            value: "no"
+        command: ['sh', '-c', '/opt/bitnami/scripts/redis/run.sh --save "" --bind "0.0.0.0"']
+      {{- end }}
+      volumes:
+      {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.global.bigid.scaler.scannerController.enabled }}
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: scanner.yaml
+            path: scanner.yaml
+          name: {{ .Values.global.bigid.scanner.fullnameOverride | default "scanner-yaml" | quote }}
+        name: scanner-yaml
+      {{- end }}
+      {{- if .Values.global.bigid.scanner.remote.enabled }}
+      - name: health
+        configMap:
+          name: {{ .Values.global.bigid.scaler.fullnameOverride | default "bigid-cache-config" | quote }}
+          defaultMode: 0755
+      {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

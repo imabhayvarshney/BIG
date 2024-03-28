@@ -1,0 +1,9 @@
+version: '3.2'
+
+services:
+  bigid-lineage:
+    volumes:
+      - type: bind
+        source: ./lineage/ssl
+        target: /etc/ssl/bigid
+        read_only: true

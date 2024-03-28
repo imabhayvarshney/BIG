@@ -1,0 +1,12 @@
+integrations:
+  - name: nri-rabbitmq
+    env:
+      HOSTNAME: bigid-mq
+      PORT: 15671
+      USERNAME: monitor
+      PASSWORD: password
+      USE_SSL: true
+      #CA_BUNDLE_DIR: /etc/rabbitmq/certfiles
+      CA_BUNDLE_FILE: /etc/rabbitmq/certfiles/cert.pem
+      REMOTE_MONITORING: true
+      INTERVAL: 30s

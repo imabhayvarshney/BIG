@@ -1,0 +1,21 @@
+global:
+  image:
+    repository: "238481145981.dkr.ecr.us-east-1.amazonaws.com/bigid"
+image:
+  tag: "rhel-6"
+
+host: bigid-cache
+port: 6379
+
+auth:
+  enabled: true
+  user: ""
+  password: "password"
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "1"
+  limits:
+    memory: "2Gi"
+    cpu: "4"

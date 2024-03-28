@@ -1,0 +1,14 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: bigid-remediation-batch
+  name: bigid-remediation-batch
+spec:
+  ports:
+    - port: 8444
+      targetPort: 8444
+  selector:
+    app: bigid-remediation-batch
+{{- end }}

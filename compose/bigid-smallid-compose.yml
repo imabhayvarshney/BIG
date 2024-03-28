@@ -1,0 +1,16 @@
+version: '3.2'
+
+services:
+  bigid-web:
+    environment:
+      - IS_SMALL_ID=true
+
+  bigid-orch:
+    environment:
+      - IS_SMALL_ID=true
+      - REPORT_METERING_DATA=true
+
+  bigid-orch2:
+    environment:
+      - IS_SMALL_ID=true
+      - REPORT_METERING_DATA=true

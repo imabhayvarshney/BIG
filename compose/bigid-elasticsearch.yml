@@ -1,0 +1,28 @@
+version: '3.2'
+
+volumes:
+  bigid-elasticsearch-data:
+    driver: local
+
+services:
+  bigid-elasticsearch:
+    image: elasticsearch:7.17.18
+    ports:
+      - "9200:9200"
+    container_name: bigid-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS:--Dlog4j2.formatMsgNoLookups=true -Xms3g -Xmx3g}
+      - bootstrap.memory_lock=true
+      - indices.queries.cache.size=${BIGID_ELASTICSEARCH_QUERIES_CACHE_SIZE:-30%}
+      - indices.fielddata.cache.size=${BIGID_ELASTICSEARCH_FIELDDATA_CACHE_SIZE:-40%}
+      - path.data=/usr/share/elasticsearch/data
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=$ELASTIC_ADMIN_PWD
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - bigid-elasticsearch-data:/usr/share/elasticsearch/data
+    restart: always

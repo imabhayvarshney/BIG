@@ -1,0 +1,21 @@
+version: '3.2'
+
+services:
+  aws-app:
+    image: 'bigexchange/bigid-aws-discovery${BIGID_ENV}'
+    expose:
+      - "8080"
+    container_name: aws-discovery
+    restart: always
+  azure-app:
+    image: 'bigexchange/bigid-azure-discovery${BIGID_ENV}'
+    expose:
+      - "8080"
+    container_name: azure-discovery
+    restart: always
+  gcp-app:
+    image: 'bigexchange/bigid-gcp-discovery${BIGID_ENV}'
+    expose:
+      - "8080"
+    container_name: gcp-discovery
+    restart: always

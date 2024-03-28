@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bigid-reports
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-reports
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- include "reports.labels" . | nindent 4 }}
+  annotations:
+    {{ include "global.skipCheckovAnnotations" . | nindent 4 }}
+    {{- with .Values.global.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.global.bigid.reports.replicaCount }}
+  selector:
+    matchLabels:
+      app: bigid-reports
+      {{- with .Values.global.podLabels }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.global.bigid.reports.updateStrategy }}
+  strategy: {{- toYaml .Values.global.bigid.reports.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.global.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.bigid.reports.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: bigid-reports
+        {{- with .Values.global.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        tags.datadoghq.com/bigid-reports.env: {{ .Release.Namespace }}
+        tags.datadoghq.com/bigid-reports.service: bigid-aci
+        tags.datadoghq.com/service: "bigid-reports"
+        tags.datadoghq.com/version: "{{ .Values.global.image.tag | trunc 63 }}"
+      {{- end }}
+    spec:
+      serviceAccount: bigid-reports
+      automountServiceAccountToken: false
+      initContainers:
+      - name: init-config-service
+        image: {{ template "initContainer.image" . }}
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        command: ['sh', '-c', "until wget -q --spider http://bigid-config-service:{{ .Values.global.bigid.configService.port }}/actuator/health; do echo waiting for bigid-config-service; sleep 3; done"]
+        resources:
+          {{- toYaml .Values.global.initContainers.resources | nindent 10 }}
+        {{- if .Values.global.initContainers.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.initContainers.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+      containers:
+      - name: bigid-reports
+        envFrom:
+        - configMapRef:
+            name: apm-configuration
+        {{- if .Values.global.extraEnvVarsCM }}
+        - configMapRef:
+            name: {{ .Values.global.extraEnvVarsCM }}
+        {{- end }}
+        {{- if .Values.global.extraEnvVarsSecret }}
+        - secretRef:
+            name: {{ .Values.global.extraEnvVarsSecret }}
+        {{- end }}
+        - configMapRef:
+            name: global-configuration
+        env:
+        {{- with .Values.global.extraEnvVars }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and (.Values.global.apm.enabled) (eq .Values.global.apm.type "datadog") }}
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: DD_ENV
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-reports.env']
+        - name: DD_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['tags.datadoghq.com/bigid-reports.service']
+        {{- end }}
+        - name: LOG_LEVEL
+          value: {{ .Values.global.bigid.reports.logLevel | quote }}
+        - name: NODE_OPTIONS
+          value: {{ printf "$(NODE_APM_OPTS) %s" (include "nodeJs.maxOldSpaceSize" .Values.global.bigid.reports) | quote }}
+        - name: IS_PART_OF_BIGID
+          value: "true"
+        - name: BIGID_MQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-user
+        - name: BIGID_MQ_PWD
+          valueFrom:
+            secretKeyRef:
+              name: bigid-auth-secret
+              key: rabbitmq-pass
+        image: "{{ .Values.global.image.repository }}/{{.Values.global.bigid.reports.image.repository }}{{ template "bigid.armRepository" . }}:{{ .Values.global.image.tag }}"
+        {{- if .Values.global.bigid.containerSecurityContext.enabled }}
+        securityContext: {{- omit .Values.global.bigid.containerSecurityContext "enabled" | toYaml | nindent 10 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.global.bigid.reports.port }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.global.bigid.reports.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.global.bigid.reports.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        resources:
+          {{- toYaml .Values.global.bigid.reports.resources | nindent 10 }}
+        volumeMounts:
+        {{- with .Values.global.extraVolumeMounts }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      {{- with .Values.global.extraVolumes }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- if .Values.global.bigid.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.global.bigid.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

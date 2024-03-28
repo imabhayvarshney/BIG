@@ -1,0 +1,28 @@
+{{- if .Values.global.bigid.ner.create }}
+{{- if .Values.global.bigid.ner.persistence.enabled }}
+{{- if eq .Values.global.bigid.ner.persistence.type ("PersistentVolumeClaim") }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: bigid-ner-pv-claim
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  {{- if not .Values.global.bigid.ner.persistence.storageClass }}
+  storageClassName:
+  {{- else }}
+  storageClassName: {{ .Values.global.bigid.ner.persistence.storageClass | quote }}
+  {{- end }}
+  accessModes:
+  {{- if not (empty .Values.global.bigid.ner.persistence.accessModes) }}
+  {{- range .Values.global.bigid.ner.persistence.accessModes }}
+    - {{ . | quote }}
+  {{- end }}
+  {{- else }}
+    - {{ .Values.global.bigid.ner.persistence.accessMode | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.global.bigid.ner.persistence.storage }}
+{{- end }}
+{{- end }}
+{{- end }}

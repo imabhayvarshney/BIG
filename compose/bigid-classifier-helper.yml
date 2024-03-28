@@ -1,0 +1,9 @@
+version: '3.2'
+
+services:
+  classifer-helper:
+    image: 'bigexchange/bigid-classifier-helper${BIGID_ENV}'
+    expose:
+      - "8080"
+    container_name: classifier-helper
+    restart: always

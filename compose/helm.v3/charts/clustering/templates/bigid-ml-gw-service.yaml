@@ -1,0 +1,19 @@
+{{- if .Values.global.bigid.clustering.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-ml-gw
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-ml-gw
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    app: bigid-ml-gw
+  ports:
+   - port: {{ .Values.global.bigid.clustering.gateway.port }}
+     targetPort: {{ .Values.global.bigid.clustering.gateway.port }}
+     name: http
+{{- end }}

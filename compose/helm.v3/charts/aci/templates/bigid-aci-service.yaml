@@ -1,0 +1,19 @@
+{{- if .Values.global.bigid.aci.create -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: bigid-aci
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: bigid-aci
+    {{- with .Values.global.additionalLabels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    app: bigid-aci
+  ports:
+   - port: {{ .Values.global.bigid.aci.port }}
+     targetPort: {{ .Values.global.bigid.aci.port }}
+     name: http
+{{- end }}

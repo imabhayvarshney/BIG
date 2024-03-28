@@ -1,0 +1,10 @@
+{{- if .Values.global.bigid.scaler.scannerController.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.global.bigid.scanner.fullnameOverride | default "scanner-yaml" | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+data:
+  scanner.yaml:
+    {{ include "scanner.yaml" . | nindent 6 | quote }}
+{{- end }}
