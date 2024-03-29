@@ -1,5 +1,0 @@
-version: '3.2'
-services:
-  bigid-data-catalog:
-    environment:
-      - CATALOG_TYPE=app

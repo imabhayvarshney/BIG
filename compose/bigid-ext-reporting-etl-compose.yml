@@ -1,6 +1,0 @@
-version: "3.2"
-
-services:
-  bigid-reporting-etl:
-    extra_hosts:
-      - bigid-mongo:${BIGID_MONGO_HOST_EXT}

@@ -1,6 +1,0 @@
-version: '3.2'
-
-services:
-  bigid-ner:
-    environment:
-      - IS_REMOTE_SCANNER=${IS_REMOTE_SCANNER:-true}

@@ -1,8 +1,0 @@
-integrations:
-  - name: nri-redis
-    env:
-      HOSTNAME: bigid-cache
-      PORT: 6379
-      REMOTE_MONITORING: true
-      PASSWORD: password
-      INTERVAL: 30s

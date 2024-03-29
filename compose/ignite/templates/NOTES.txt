@@ -1,1 +1,0 @@
-The Ignite cluster has been installed sucessfully as {{ .Release.Name }} in {{ .Release.Namespace }} namespace.

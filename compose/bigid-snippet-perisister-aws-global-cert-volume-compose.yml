@@ -1,9 +1,0 @@
-version: '3.2'
-
-services:
-  bigid-snippet-persister:
-    volumes:
-      - type: bind
-        source: ./certs/global-bundle.pem
-        target: ${POSTGRES_CERTIFICATE_PATH:-/tmp/certs/global-bundle.pem}
-        read_only: true
