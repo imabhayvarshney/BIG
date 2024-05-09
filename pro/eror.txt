@@ -1,0 +1,29 @@
+Error: INSTALLATION FAILED: rendered manifests contain a resource that already exists. Unable to continue with install: 
+could not get information about the resource ServiceAccount "bigid-action-center" in namespace "newns": 
+Get "https://127.0.0.1:16443/api/v1/namespaces/newns/serviceaccounts/bigid-action-center": dial tcp 127.0.0.1:16443: connect: connection refused
+
+
+Error: rendered manifests contain a resource that already exists. Unable to continue with install: could not get information about the resource 
+NetworkPolicy "bigid-mq" in namespace "example": Get "https://127.0.0.1:16443/apis/networking.k8s.io/v1/namespaces/example/networkpolicies/bigid-mq": 
+dial tcp 127.0.0.1:16443: connect: connection refused
+
+Error: INSTALLATION FAILED: could not get server version from Kubernetes: Get "https://127.0.0.1:16443/version?timeout=32s": dial tcp 127.0.0.1:16443: connect: connection refused
+
+Error: INSTALLATION FAILED: Kubernetes cluster unreachable: Get "https://127.0.0.1:16443/version": dial tcp 127.0.0.1:16443: connect: connection refused
+ubuntu@bigid-small-populated:~/BIG/compose/helm.v3$ helm install bigid -f values.yaml . -n newns
+lookup_func.go:111: [ERROR] unable to retrieve resource list for: v1 , error: Get "https://127.0.0.1:16443/api/v1?timeout=32s": dial tcp 127.0.0.1:16443: connect: connection refused
+lookup_func.go:85: [ERROR] unable to get apiresource from unstructured: /v1, Kind=Secret , error Get "https://127.0.0.1:16443/api/v1?timeout=32s": dial tcp 127.0.0.1:16443: connect: connection refused
+Error: INSTALLATION FAILED: template: bigid/charts/rabbitmq/templates/statefulset.yaml:36:28: executing "bigid/charts/rabbitmq/templates/statefulset.yaml" 
+at <include (print $.Template.BasePath "/tls-secrets.yaml") .>: error calling include: template: bigid/charts/rabbitmq/templates/tls-secrets.yaml:32:14: 
+executing "bigid/charts/rabbitmq/templates/tls-secrets.yaml" at <include "common.secrets.lookup" (dict "secret" $secretName "key" "tls.crt" "defaultValue" 
+$cert.Cert "context" $)>: error calling include: template: bigid/charts/rabbitmq/charts/common/templates/_secrets.tpl:156:20: executing 
+"common.secrets.lookup" at <lookup "v1" "Secret" (include "common.names.namespace" .context) .secret>: error calling lookup: unable to get apiresource 
+from unstructured: /v1, Kind=Secret: Get "https://127.0.0.1:16443/api/v1?timeout=32s": dial tcp 127.0.0.1:16443: connect: connection refused
+
+Error: UPGRADE FAILED: query: failed to query with labels: Get "https://127.0.0.1:16443/api/v1/namespaces/default/secrets?labelSelector=name%3Dbigid%2Cowner%3Dhelm": dial tcp 127.0.0.1:16443: connect: connection refused
+
+
+helm install  bigid -f values.yaml . --namespace=BIGID --create-namespace --set global.image.tag=release-196.18 
+
+kubectl -n default describe rs helloworld-deployment-7ccbf84fdb
+kubectl -n default describe deployment bigid-ui

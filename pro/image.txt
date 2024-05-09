@@ -1,0 +1,32 @@
+kubectl create secret docker-registry secret-key --docker-server=https://hub.docker.com/repositories/imabhay --docker-username=imabhay --docker-password=Abhay@2000 
+
+kubectl get secret secret-key --output=yaml
+
+docker tag bigid/bigid-ui:release-196.18 imabhay/bigid/bigid-ui:release-196.18
+docker push imabhay/bigid/bigid-ui:release-196.18
+
+
+scp bigid/bigid-ui ubuntu@bigid-small-populated/Images
+
+
+sudo docker save image:tag > image.tar
+microk8s ctr image import image.tar
+
+
+sudo docker save bigid/bigid-ui-harden:release-196.18 > bigid-ui-harden.tar
+microk8s ctr image import bigid-ui-harden.tar
+microk8s ctr images ls | grep rabbitmq-exporter
+
+bigid/bigid-scanner 
+bigid/bigid-action-center
+bigid/bigid-reports
+bigid/bigid-orch
+bigid/bigid-data-catalog
+bigid/bigid-corr-new
+bigid/bigid-config-service
+bitnami/redis                                          7.2.4            4681c27056ac   5 weeks ago     144MB
+bitnami/mongodb                                        6.0.13           7ffa7118a17b   6 weeks ago     585MB
+bitnami/rabbitmq                                       3.12.12          efc3c8e36062   6 weeks ago     212MB
+bitnami/elasticsearch                                  7.17.16          df7ac7163732   2 months ago    698MB
+bigid/alpine                                           edge             9198849dd7f6   3 months ago    7.38MB
+bigid/rabbitmq-exporter 

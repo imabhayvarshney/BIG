@@ -1,0 +1,89 @@
+curl -u imabhayvarshney:Abhay@23 https://docs.bigid.com/releases/docs/19618 -o bigid-images-scanner-slim-release-196.18.tar.gz
+https://0-4751.ssh.mybigid.com/
+https://0-4793.ssh.mybigid.com/
+
+curl -O  https://eu.downloads.bigid.com/?file=release-196.18/bigid-compose-release-196.18.tar.gz
+
+Access BigID Docs 
+
+You will receive a link to sign up for an Auth0 account with BigID. This will allow you to access our documentation portal, https://docs.bigid.com. Please let me know if you do not receive this email.
+
+The support site is not required for this exercise, please disregard if a link is received to the site.
+
+Please use the following to download the images if you are unable to download from the docs site:  
+
+Helm charts are included in the "Compose (contains compose directory files)" link
+
+bigid-compose-release-196.18.tar.gz
+
+bigid-images-slim-release-196.18.tar.gz
+
+bigid-images-third-party-release-196.18.tar.gz
+
+
+Install BigID in the provided lab environment
+
+A clean Kubernetes server, pre-configured with all the dependencies to install BigID. You are also welcome to use your own, if preferred. The provided lab and license are valid through 10/04/2024.
+
+Access SSH: https://0-4751.ssh.mybigid.com/
+
+Access Web: https://0-4751.mybigid.com/
+
+An initial screen presenting "Your lab is loading..." is expected until you progress in the lab exercise via SSH.
+
+It is recommended that you push images to a private registry that you host that is accessible by the node(s), or load/import your images into the node(s) supported container-runtime.
+
+You will need to set the UI service to Nodeport with an internal port of 443 and a NodePort of 30443
+
+CPU and Memory requests should be reduced to 100m and 1Gi for all pods minus the following:
+
+Mongo - default
+
+MQ - default
+
+Scanner - 2 cpu 4Gi
+
+Correlator 1 cpu 2Gi
+
+There are two ways to deploy MongoDB:
+
+Externally (outside of the helm deploy either as a standalone DB or containerized - this method is typically used for production)
+
+Internally (deployed as part of the helm deploy - this method is typically used in sandboxes/labs).
+
+Each method above has a different section under the mongodb section of the values.yaml file.
+
+License (for when prompted):
+
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IkJpZ0lEIENhbmRpZGF0ZSIsImxpY2Vuc2VOYW1lIjoiQmlnSUQgVGVtcCBMaWNlbnNlIGZvciBjYW5kaWRhdGUgQWJoYXkgVmFyc2huZXkgZXhwaXJlcyBBcHJpbCAxMCAyMDI0IiwiY3JlYXRpb25EYXRlIjoiMjAyNC0wMy0yN1QxNjo1ODoyNC4wNTdaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI0LTA0LTEwVDA0OjAwOjAwLjAwMFoiLCJudW1iZXJPZkRhdGFTb3VyY2VzIjo1LCJwZXJtaXR0ZWREYXRhU291cmNlcyI6WyIqIl0sIm51bWJlck9mSWRlbnRpdGllcyI6LTEsImxpY2Vuc2VUeXBlIjoiRm91bmRhdGlvbiIsInF1b3RhTGltaXRJbkdCIjotMSwiaXNUcmlhbCI6ZmFsc2UsImFwcGxpY2F0aW9uQnVuZGxlcyI6W10sInNpbmdsZUFwcHMiOltdfQ.rumRUVR3gkM8uZKUxqz_LevwyLJxfV5wL_EmAonGEh80E0lWorWBZQjiTYG7FYGEeqkn8yRGe5P-W-KnzznZwIiv1hEiMfu_KH-k3LG630n9LNc9Dgn5Ykd5bG7CWDp_FPoHDC1sKJZnJZ-EYsWufxareMhWFyLBqcvY36eLsJ7YfeJQmX8DJn2yHhTBj4lzCoq8JNS4OODvEuq9joKCmGsuEakZ7iu-0Hi8kVwDQiZTXBa5VeTRhPYh4jT1RHthEnwaTNLETX1LmrYYEQM3IoG2OIEMDgd5AMFnsDwWzQVlQnjMEdshH5RNJ_VmoVu7A8B7z0S5RivP7sYuXWvoYunR2tirYw8y-3X7nh1SZhcin4xkfVx_0OFVhnzbd98WGIYsbdUdfuX5sKyhWAcPXaxefi_jFSzgXwp6_6n5v_IB8qsL1slVxwrpvdZeAsYAptjyje7ThiwHcQU5r4pP4C5Cbnchjn6RSMtvRiVBhNxZMaDqTjaTurf1OMmSfzdzvF4QJXvaM-TDVkU0E4hWZg89ZXFpbWkUDNNraPZHvx54k6kWSpHjWcthKHlK-s3rMM37pJnYKE43mXc7k6xgLnTDtlEaIztriqLANU-pNYa3hOfv6hm0-HrxjmaWbecchguJC7JWFj39MqQskqWEZNy4-Nljmh3TQ62mywzBJgI`
+
+Create and onboard a Data Source
+
+Spin up a MySQL instance on the same machine
+
+Import mock data:
+
+The mock dataset contains ~100,000 identities sliced up into CSV files which can be imported into MySQL.
+
+The IDSOR file is intended for use as a Correlation Training Set.
+
+Link to the zip of mock data to use during the lab: 
+
+https://bigid-servicescf.s3.amazonaws.com/Lab+dummy+data/100k+mock+identities_csv.zip
+
+Onboard the data source to BigID
+
+
+
+
+
+
+CREATE USER 'ubuntu'@'bigid-small-populated' IDENTIFIED BY 'mysql';
+
+LOAD DATA INFILE 'data.csv' INTO TABLE tablename;
+
+
+helm install bigid -f values.yaml . -n new
+
+
+This is meant to be an exercise so please do not hesitate to reach out should you have any questions or hit a roadblock. Please let me and Alex know when you are ready for a lab review any time next week.

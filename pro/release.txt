@@ -1,0 +1,38 @@
+curl -u imabhayvarshney@gmail.com:Abhay@23 https://eu.downloads.bigid.com/?file=release-196.18/bigid-compose-release-196.18.tar.gz -o bigid-compose-release-196.18.tar.gz
+
+release-196.18_bigid-compose-release-196.18.tar.gz
+
+bigid-compose-release-196.18.tar.gz
+
+release-196.18_arm64_bigid-compose-arm64-release-196.18.tar.gz
+
+bigid-images-third-party-release-196.18.tar.gz
+
+curl -u imabhayvarshney:Abhay@23 https://docs.bigid.com/releases/docs/19618 -o release-196.18_bigid-images-third-party-release-196.18.tar.gz
+
+curl -u imabhayvarshney:Abhay@23 https://docs.bigid.com/releases/docs/19618 -o release-196.18_arm64_bigid-compose-arm64-release-196.18.tar.gz
+
+wget https://docs.bigid.com/releases/docs/19618/ -o bigid-compose-release-196.18.tar.gz
+
+
+gunzip release-196.18_bigid-images-third-party-release-196.18.tar.gz
+
+
+tar -zxvf bigid-compose-release-196.18.tar.gz
+
+gzip: stdin: unexpected end of file
+tar: Child returned status 1
+tar: Error is not recoverable: exiting now
+
+https://eu.downloads.bigid.com/?file=release-196.18/bigid-compose-release-196.18.tar.gz
+
+curl -u imabhayvarshney@gmail.com:Abhay@23 https://bigid-servicescf.s3.amazonaws.com/Lab+dummy+data/100k+mock+identities_csv.zip -o 100k+mock+identities_csv
+
+
+curl -u imabhayvarshney@gmail.com:Abhay@23 https://eu.downloads.bigid.com/?file=release-196.18/bigid-compose-release-196.18.tar.gz -o bigid-compose-release-196.18.tar.gz
+
+curl -u imabhayvarshney@gmail.com:Abhay@23 https://eu.downloads.bigid.com/?file=release-196.18/bigid-images-slim-release-196.18.tar.gz -o bigid-images-slim-release-196.18.tar.gz
+
+curl -u imabhayvarshney@gmail.com:Abhay@23 https://eu.downloads.bigid.com/?file=release-196.18/bigid-images-third-party-release-196.18.tar.gz -o bigid-images-third-party-release-196.18.tar.gz
+
+wget --user=imabhayvarshney@gmail.com --password=Abhay@23 https://eu.downloads.bigid.com/?file=release-196.18/bigid-compose-release-196.18.tar.gz
